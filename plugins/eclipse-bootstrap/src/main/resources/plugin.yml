@@ -1,0 +1,14 @@
+name: Eclipse
+version: ${version}
+main: dev.modichamiya.eclipse.bootstrap.EclipsePlugin
+api-version: '1.21'
+authors: [Modiji]
+commands:
+  eclipse:
+    description: Project Eclipse admin command suite
+    usage: /eclipse <reload|module list|profile>
+    permission: eclipse.admin
+permissions:
+  eclipse.admin:
+    description: Grants access to Project Eclipse admin commands
+    default: op
