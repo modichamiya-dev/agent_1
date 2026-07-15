@@ -28,11 +28,8 @@ import java.util.concurrent.TimeUnit;
 public final class GameplayEngineModule implements CoreRuntime.EngineModule {
     private PlayerProfileServiceImpl profileService;
 
-    @Override
-    public String id() { return "gameplay"; }
-
-    @Override
-    public Set<String> dependencies() { return Set.of("core", "config", "database", "registry"); }
+    @Override public String id() { return "gameplay"; }
+    @Override public Set<String> dependencies() { return Set.of("core", "config", "database", "registry"); }
 
     @Override
     public void onEnable(CoreRuntime.ModuleContext context) {
@@ -41,16 +38,17 @@ public final class GameplayEngineModule implements CoreRuntime.EngineModule {
         EclipseApi.RegistryService registryService = context.services().require(EclipseApi.RegistryService.class);
 
         this.profileService = new PlayerProfileServiceImpl(databaseService, context);
-        ProgressionServiceImpl progressionService = new ProgressionServiceImpl(profileService, registryService);
         StatServiceImpl statService = new StatServiceImpl(profileService, registryService);
+        ProgressionServiceImpl progressionService = new ProgressionServiceImpl(profileService, statService);
+        ItemServiceImpl itemService = new ItemServiceImpl(registryService);
 
         context.services().register(EclipseApi.PlayerProfileService.class, profileService);
         context.services().register(EclipseApi.ProgressionService.class, progressionService);
         context.services().register(EclipseApi.StatService.class, statService);
-        context.services().register(EclipseApi.GameplaySystemService.class, () -> "Phase 1/9 profile + progression scaffold online");
+        context.services().register(EclipseApi.ItemService.class, itemService);
+        context.services().register(EclipseApi.GameplaySystemService.class, () -> "Phase 1/9/10 profile, progression, and item scaffold online");
 
         context.plugin().getServer().getPluginManager().registerEvents(new ProfileListener(profileService), context.plugin());
-
         long autosaveTicks = configService.config("eclipse").longValue("autosave-interval-ticks", 20L * 60L * 5L);
         context.plugin().getServer().getScheduler().runTaskTimerAsynchronously(context.plugin(), () -> profileService.saveAll(), autosaveTicks, autosaveTicks);
         context.logger(id()).info("Gameplay foundation enabled with autosave every " + autosaveTicks + " ticks.");
@@ -58,9 +56,7 @@ public final class GameplayEngineModule implements CoreRuntime.EngineModule {
 
     @Override
     public void onDisable(CoreRuntime.ModuleContext context) {
-        if (profileService != null) {
-            profileService.saveAll().orTimeout(10, TimeUnit.SECONDS).join();
-        }
+        if (profileService != null) profileService.saveAll().orTimeout(10, TimeUnit.SECONDS).join();
     }
 }
 
@@ -92,8 +88,7 @@ final class PlayerProfileServiceImpl implements EclipseApi.PlayerProfileService 
             return CompletableFuture.completedFuture(cached.snapshot());
         }
         return databaseService.supplyAsync(() -> {
-            try (Connection connection = databaseService.dataSource().getConnection();
-                 PreparedStatement statement = connection.prepareStatement("SELECT * FROM players WHERE uuid = ?")) {
+            try (Connection connection = databaseService.dataSource().getConnection(); PreparedStatement statement = connection.prepareStatement("SELECT * FROM players WHERE uuid = ?")) {
                 statement.setString(1, uniqueId.toString());
                 try (ResultSet resultSet = statement.executeQuery()) {
                     CachedProfile loaded;
@@ -135,8 +130,7 @@ final class PlayerProfileServiceImpl implements EclipseApi.PlayerProfileService 
     }
 
     private void saveProfile(CachedProfile profile) {
-        try (Connection connection = databaseService.dataSource().getConnection();
-             PreparedStatement statement = connection.prepareStatement("INSERT INTO players(uuid, last_name, created_at, last_seen_at, progression_json) VALUES (?, ?, ?, ?, ?) ON CONFLICT(uuid) DO UPDATE SET last_name = excluded.last_name, created_at = excluded.created_at, last_seen_at = excluded.last_seen_at, progression_json = excluded.progression_json")) {
+        try (Connection connection = databaseService.dataSource().getConnection(); PreparedStatement statement = connection.prepareStatement("INSERT INTO players(uuid, last_name, created_at, last_seen_at, progression_json) VALUES (?, ?, ?, ?, ?) ON CONFLICT(uuid) DO UPDATE SET last_name = excluded.last_name, created_at = excluded.created_at, last_seen_at = excluded.last_seen_at, progression_json = excluded.progression_json")) {
             statement.setString(1, profile.uniqueId.toString());
             statement.setString(2, profile.lastKnownName);
             statement.setString(3, profile.createdAt.toString());
@@ -151,17 +145,16 @@ final class PlayerProfileServiceImpl implements EclipseApi.PlayerProfileService 
 
 final class ProgressionServiceImpl implements EclipseApi.ProgressionService {
     private final PlayerProfileServiceImpl profileService;
-    private final EclipseApi.RegistryService registryService;
+    private final StatServiceImpl statService;
 
-    ProgressionServiceImpl(PlayerProfileServiceImpl profileService, EclipseApi.RegistryService registryService) {
+    ProgressionServiceImpl(PlayerProfileServiceImpl profileService, StatServiceImpl statService) {
         this.profileService = profileService;
-        this.registryService = registryService;
+        this.statService = statService;
     }
 
     @Override
     public EclipseApi.ProgressionSnapshot snapshot(UUID uniqueId) {
         EclipseApi.PlayerProfile profile = profileService.getCached(uniqueId).orElseGet(() -> new EclipseApi.PlayerProfile(uniqueId, "unknown", Instant.EPOCH, Instant.EPOCH, EclipseApi.ProgressionScaffold.empty()));
-        StatServiceImpl statService = new StatServiceImpl(profileService, registryService);
         return new EclipseApi.ProgressionSnapshot(uniqueId, profile.lastKnownName(), profile.progression().level(), profile.progression().experience(), profile.progression().skills(), profile.progression().collections(), statService.resolve(uniqueId));
     }
 
@@ -214,6 +207,74 @@ final class StatServiceImpl implements EclipseApi.StatService {
         }
         return base;
     }
+}
+
+final class ItemServiceImpl implements EclipseApi.ItemService {
+    private final EclipseApi.RegistryService registryService;
+    private final Map<UUID, EclipseApi.ItemInstance> items = new ConcurrentHashMap<>();
+    private final Map<UUID, MutableLoadout> loadouts = new ConcurrentHashMap<>();
+
+    ItemServiceImpl(EclipseApi.RegistryService registryService) {
+        this.registryService = registryService;
+    }
+
+    @Override
+    public EclipseApi.ItemInstance createInstance(String definitionKey, UUID owner, String sourceTag) {
+        EclipseApi.GenericDefinition definition = registryService.registry("item", EclipseApi.GenericDefinition.class).get(definitionKey)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown item definition: " + definitionKey));
+        UUID itemId = UUID.randomUUID();
+        String rarity = String.valueOf(definition.values().getOrDefault("rarity", "common"));
+        Map<String, Double> rolledStats = new LinkedHashMap<>();
+        Object rawStats = definition.values().get("base_stats");
+        if (rawStats instanceof Map<?, ?> map) {
+            map.forEach((key, value) -> rolledStats.put(String.valueOf(key), value instanceof Number number ? number.doubleValue() : Double.parseDouble(String.valueOf(value))));
+        }
+        EclipseApi.ItemInstance instance = new EclipseApi.ItemInstance(itemId, definitionKey, owner, sourceTag, rarity, 0, rolledStats, List.of(), List.of(), Optional.empty());
+        items.put(itemId, instance);
+        loadouts.computeIfAbsent(owner, ignored -> new MutableLoadout(owner));
+        return instance;
+    }
+
+    @Override public Optional<EclipseApi.ItemInstance> getInstance(UUID itemId) { return Optional.ofNullable(items.get(itemId)); }
+    @Override public Collection<EclipseApi.ItemInstance> equipped(UUID owner) { return items.values().stream().filter(item -> item.owner().equals(owner) && item.equippedSlot().isPresent()).toList(); }
+    @Override public EclipseApi.EquipmentLoadout loadout(UUID owner) { return loadouts.computeIfAbsent(owner, MutableLoadout::new).snapshot(); }
+
+    @Override
+    public boolean equip(UUID owner, EclipseApi.EquipmentSlot slot, UUID itemId) {
+        EclipseApi.ItemInstance instance = items.get(itemId);
+        if (instance == null || !instance.owner().equals(owner)) return false;
+        EclipseApi.GenericDefinition definition = registryService.registry("item", EclipseApi.GenericDefinition.class).get(instance.definitionKey()).orElse(null);
+        if (definition == null) return false;
+        String primarySlot = String.valueOf(definition.values().getOrDefault("primary_slot", slot.name()));
+        if (!slot.name().equalsIgnoreCase(primarySlot) && slot != EclipseApi.EquipmentSlot.ACCESSORY_BAG) return false;
+        MutableLoadout loadout = loadouts.computeIfAbsent(owner, MutableLoadout::new);
+        loadout.slots.put(slot, itemId);
+        if (slot == EclipseApi.EquipmentSlot.ACCESSORY_BAG && !loadout.accessoryBag.contains(itemId)) loadout.accessoryBag.add(itemId);
+        items.put(itemId, new EclipseApi.ItemInstance(instance.itemId(), instance.definitionKey(), instance.owner(), instance.sourceTag(), instance.rarity(), instance.upgradeLevel(), instance.rolledStats(), instance.affixes(), instance.sockets(), Optional.of(slot)));
+        return true;
+    }
+
+    @Override
+    public boolean unequip(UUID owner, EclipseApi.EquipmentSlot slot) {
+        MutableLoadout loadout = loadouts.get(owner);
+        if (loadout == null) return false;
+        UUID itemId = loadout.slots.remove(slot);
+        if (itemId == null) return false;
+        EclipseApi.ItemInstance instance = items.get(itemId);
+        if (instance != null) {
+            items.put(itemId, new EclipseApi.ItemInstance(instance.itemId(), instance.definitionKey(), instance.owner(), instance.sourceTag(), instance.rarity(), instance.upgradeLevel(), instance.rolledStats(), instance.affixes(), instance.sockets(), Optional.empty()));
+        }
+        if (slot == EclipseApi.EquipmentSlot.ACCESSORY_BAG) loadout.accessoryBag.remove(itemId);
+        return true;
+    }
+}
+
+final class MutableLoadout {
+    final UUID owner;
+    final Map<EclipseApi.EquipmentSlot, UUID> slots = new ConcurrentHashMap<>();
+    final List<UUID> accessoryBag = new ArrayList<>();
+    MutableLoadout(UUID owner) { this.owner = owner; }
+    EclipseApi.EquipmentLoadout snapshot() { return new EclipseApi.EquipmentLoadout(owner, slots, accessoryBag); }
 }
 
 final class CachedProfile {
