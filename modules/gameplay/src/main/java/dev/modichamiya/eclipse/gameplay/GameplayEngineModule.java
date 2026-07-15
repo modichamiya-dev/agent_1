@@ -13,7 +13,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -26,22 +29,25 @@ public final class GameplayEngineModule implements CoreRuntime.EngineModule {
     private PlayerProfileServiceImpl profileService;
 
     @Override
-    public String id() {
-        return "gameplay";
-    }
+    public String id() { return "gameplay"; }
 
     @Override
-    public Set<String> dependencies() {
-        return Set.of("core", "config", "database", "registry");
-    }
+    public Set<String> dependencies() { return Set.of("core", "config", "database", "registry"); }
 
     @Override
     public void onEnable(CoreRuntime.ModuleContext context) {
         EclipseApi.DatabaseService databaseService = context.services().require(EclipseApi.DatabaseService.class);
         EclipseApi.ConfigService configService = context.services().require(EclipseApi.ConfigService.class);
+        EclipseApi.RegistryService registryService = context.services().require(EclipseApi.RegistryService.class);
+
         this.profileService = new PlayerProfileServiceImpl(databaseService, context);
+        ProgressionServiceImpl progressionService = new ProgressionServiceImpl(profileService, registryService);
+        StatServiceImpl statService = new StatServiceImpl(profileService, registryService);
+
         context.services().register(EclipseApi.PlayerProfileService.class, profileService);
-        context.services().register(EclipseApi.GameplaySystemService.class, () -> "Phase 1 profile + progression scaffold online");
+        context.services().register(EclipseApi.ProgressionService.class, progressionService);
+        context.services().register(EclipseApi.StatService.class, statService);
+        context.services().register(EclipseApi.GameplaySystemService.class, () -> "Phase 1/9 profile + progression scaffold online");
 
         context.plugin().getServer().getPluginManager().registerEvents(new ProfileListener(profileService), context.plugin());
 
@@ -60,20 +66,9 @@ public final class GameplayEngineModule implements CoreRuntime.EngineModule {
 
 final class ProfileListener implements Listener {
     private final EclipseApi.PlayerProfileService profileService;
-
-    ProfileListener(EclipseApi.PlayerProfileService profileService) {
-        this.profileService = profileService;
-    }
-
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        profileService.loadOrCreate(event.getPlayer().getUniqueId(), event.getPlayer().getName());
-    }
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        profileService.save(event.getPlayer().getUniqueId());
-    }
+    ProfileListener(EclipseApi.PlayerProfileService profileService) { this.profileService = profileService; }
+    @EventHandler public void onJoin(PlayerJoinEvent event) { profileService.loadOrCreate(event.getPlayer().getUniqueId(), event.getPlayer().getName()); }
+    @EventHandler public void onQuit(PlayerQuitEvent event) { profileService.save(event.getPlayer().getUniqueId()); }
 }
 
 final class PlayerProfileServiceImpl implements EclipseApi.PlayerProfileService {
@@ -96,7 +91,6 @@ final class PlayerProfileServiceImpl implements EclipseApi.PlayerProfileService 
             cached.dirty = true;
             return CompletableFuture.completedFuture(cached.snapshot());
         }
-
         return databaseService.supplyAsync(() -> {
             try (Connection connection = databaseService.dataSource().getConnection();
                  PreparedStatement statement = connection.prepareStatement("SELECT * FROM players WHERE uuid = ?")) {
@@ -104,14 +98,7 @@ final class PlayerProfileServiceImpl implements EclipseApi.PlayerProfileService 
                 try (ResultSet resultSet = statement.executeQuery()) {
                     CachedProfile loaded;
                     if (resultSet.next()) {
-                        loaded = new CachedProfile(
-                                uniqueId,
-                                resultSet.getString("last_name"),
-                                Instant.parse(resultSet.getString("created_at")),
-                                Instant.parse(resultSet.getString("last_seen_at")),
-                                gson.fromJson(resultSet.getString("progression_json"), EclipseApi.ProgressionScaffold.class),
-                                false
-                        );
+                        loaded = new CachedProfile(uniqueId, resultSet.getString("last_name"), Instant.parse(resultSet.getString("created_at")), Instant.parse(resultSet.getString("last_seen_at")), gson.fromJson(resultSet.getString("progression_json"), EclipseApi.ProgressionScaffold.class), false);
                     } else {
                         loaded = new CachedProfile(uniqueId, lastKnownName, Instant.now(), Instant.now(), EclipseApi.ProgressionScaffold.empty(), true);
                         insertNewProfile(connection, loaded);
@@ -131,38 +118,10 @@ final class PlayerProfileServiceImpl implements EclipseApi.PlayerProfileService 
         });
     }
 
-    @Override
-    public Optional<EclipseApi.PlayerProfile> getCached(UUID uniqueId) {
-        CachedProfile cached = cache.get(uniqueId);
-        return cached == null ? Optional.empty() : Optional.of(cached.snapshot());
-    }
-
-    @Override
-    public Collection<EclipseApi.PlayerProfile> onlineProfiles() {
-        return cache.values().stream().map(CachedProfile::snapshot).toList();
-    }
-
-    @Override
-    public CompletableFuture<Void> save(UUID uniqueId) {
-        CachedProfile cached = cache.get(uniqueId);
-        if (cached == null || !cached.dirty) {
-            return CompletableFuture.completedFuture(null);
-        }
-        return databaseService.runAsync(() -> saveProfile(cached)).thenRun(() -> cached.dirty = false);
-    }
-
-    @Override
-    public CompletableFuture<Void> saveAll() {
-        CompletableFuture<?>[] saves = cache.keySet().stream().map(this::save).toArray(CompletableFuture[]::new);
-        return CompletableFuture.allOf(saves);
-    }
-
-    Optional<EclipseApi.PlayerProfile> findByName(String name) {
-        return cache.values().stream()
-                .map(CachedProfile::snapshot)
-                .filter(profile -> profile.lastKnownName().equalsIgnoreCase(name))
-                .findFirst();
-    }
+    @Override public Optional<EclipseApi.PlayerProfile> getCached(UUID uniqueId) { CachedProfile cached = cache.get(uniqueId); return cached == null ? Optional.empty() : Optional.of(cached.snapshot()); }
+    @Override public Collection<EclipseApi.PlayerProfile> onlineProfiles() { return cache.values().stream().map(CachedProfile::snapshot).toList(); }
+    @Override public CompletableFuture<Void> save(UUID uniqueId) { CachedProfile cached = cache.get(uniqueId); if (cached == null || !cached.dirty) return CompletableFuture.completedFuture(null); return databaseService.runAsync(() -> saveProfile(cached)).thenRun(() -> cached.dirty = false); }
+    @Override public CompletableFuture<Void> saveAll() { CompletableFuture<?>[] saves = cache.keySet().stream().map(this::save).toArray(CompletableFuture[]::new); return CompletableFuture.allOf(saves); }
 
     private void insertNewProfile(Connection connection, CachedProfile profile) throws Exception {
         try (PreparedStatement insert = connection.prepareStatement("INSERT INTO players(uuid, last_name, created_at, last_seen_at, progression_json) VALUES (?, ?, ?, ?, ?)")) {
@@ -190,6 +149,73 @@ final class PlayerProfileServiceImpl implements EclipseApi.PlayerProfileService 
     }
 }
 
+final class ProgressionServiceImpl implements EclipseApi.ProgressionService {
+    private final PlayerProfileServiceImpl profileService;
+    private final EclipseApi.RegistryService registryService;
+
+    ProgressionServiceImpl(PlayerProfileServiceImpl profileService, EclipseApi.RegistryService registryService) {
+        this.profileService = profileService;
+        this.registryService = registryService;
+    }
+
+    @Override
+    public EclipseApi.ProgressionSnapshot snapshot(UUID uniqueId) {
+        EclipseApi.PlayerProfile profile = profileService.getCached(uniqueId).orElseGet(() -> new EclipseApi.PlayerProfile(uniqueId, "unknown", Instant.EPOCH, Instant.EPOCH, EclipseApi.ProgressionScaffold.empty()));
+        StatServiceImpl statService = new StatServiceImpl(profileService, registryService);
+        return new EclipseApi.ProgressionSnapshot(uniqueId, profile.lastKnownName(), profile.progression().level(), profile.progression().experience(), profile.progression().skills(), profile.progression().collections(), statService.resolve(uniqueId));
+    }
+
+    @Override public Collection<EclipseApi.ProgressionSnapshot> onlineSnapshots() { return profileService.onlineProfiles().stream().map(profile -> snapshot(profile.uniqueId())).toList(); }
+    @Override public Optional<EclipseApi.SkillProgress> skill(UUID uniqueId, String skillKey) { return Optional.ofNullable(snapshot(uniqueId).skills().get(skillKey)); }
+    @Override public Optional<EclipseApi.CollectionProgress> collection(UUID uniqueId, String collectionKey) { return Optional.ofNullable(snapshot(uniqueId).collections().get(collectionKey)); }
+}
+
+final class StatServiceImpl implements EclipseApi.StatService {
+    private final PlayerProfileServiceImpl profileService;
+    private final EclipseApi.RegistryService registryService;
+
+    StatServiceImpl(PlayerProfileServiceImpl profileService, EclipseApi.RegistryService registryService) {
+        this.profileService = profileService;
+        this.registryService = registryService;
+    }
+
+    @Override
+    public EclipseApi.ResolvedStatBlock resolve(UUID uniqueId) {
+        Map<String, Double> values = new LinkedHashMap<>(definitions());
+        List<String> sources = new ArrayList<>();
+        profileService.getCached(uniqueId).ifPresent(profile -> {
+            sources.add("base_attributes");
+            sources.add("profile_level=" + profile.progression().level());
+            values.computeIfPresent("eclipse:strength", (key, base) -> base + (profile.progression().level() - 1) * 0.5D);
+            values.computeIfPresent("eclipse:intelligence", (key, base) -> base + (profile.progression().level() - 1) * 0.75D);
+            for (EclipseApi.SkillProgress skill : profile.progression().skills().values()) {
+                registryService.registry("skill", EclipseApi.GenericDefinition.class).get(skill.skillKey()).ifPresent(definition -> {
+                    Object raw = definition.values().get("attribute_bonuses_per_level");
+                    if (raw instanceof Map<?, ?> map) {
+                        map.forEach((attributeKey, scalar) -> {
+                            double perLevel = scalar instanceof Number number ? number.doubleValue() : Double.parseDouble(String.valueOf(scalar));
+                            values.merge(String.valueOf(attributeKey), perLevel * skill.level(), Double::sum);
+                        });
+                    }
+                    sources.add("skill:" + skill.skillKey() + "@" + skill.level());
+                });
+            }
+        });
+        return new EclipseApi.ResolvedStatBlock(values, sources);
+    }
+
+    @Override
+    public Map<String, Double> definitions() {
+        Map<String, Double> base = new LinkedHashMap<>();
+        for (EclipseApi.GenericDefinition definition : registryService.registry("attribute", EclipseApi.GenericDefinition.class).snapshot()) {
+            Object rawBase = definition.values().getOrDefault("base_value", 0.0D);
+            double value = rawBase instanceof Number number ? number.doubleValue() : Double.parseDouble(String.valueOf(rawBase));
+            base.put(definition.key(), value);
+        }
+        return base;
+    }
+}
+
 final class CachedProfile {
     final UUID uniqueId;
     String lastKnownName;
@@ -207,7 +233,5 @@ final class CachedProfile {
         this.dirty = dirty;
     }
 
-    EclipseApi.PlayerProfile snapshot() {
-        return new EclipseApi.PlayerProfile(uniqueId, lastKnownName, createdAt, lastSeenAt, progression);
-    }
+    EclipseApi.PlayerProfile snapshot() { return new EclipseApi.PlayerProfile(uniqueId, lastKnownName, createdAt, lastSeenAt, progression); }
 }
