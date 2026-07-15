@@ -6,7 +6,7 @@ authors: [Modiji]
 commands:
   eclipse:
     description: Project Eclipse admin command suite
-    usage: /eclipse <reload|module list|profile|content ...|assets ...|timeline ...|gui ...|world ...>
+    usage: /eclipse <reload|module list|profile|content ...|assets ...|timeline ...|gui ...|world ...|progression ...|item ...>
     permission: eclipse.admin
 permissions:
   eclipse.admin:
