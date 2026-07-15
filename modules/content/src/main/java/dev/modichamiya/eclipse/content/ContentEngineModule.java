@@ -8,7 +8,6 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.io.Writer;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -70,6 +69,7 @@ final class ContentServiceImpl implements EclipseApi.ContentService {
     private final EclipseApi.ConfigService configService;
     private final EclipseApi.RegistryService registryService;
     private final Map<String, ContentSchema> schemas;
+    private final Set<String> registryNames;
     private final Map<String, String> defaultContentFiles;
     private final Yaml yaml = new Yaml();
     private final Gson gson = new Gson();
@@ -81,6 +81,7 @@ final class ContentServiceImpl implements EclipseApi.ContentService {
         this.configService = configService;
         this.registryService = registryService;
         this.schemas = BuiltInSchemas.create();
+        this.registryNames = schemas.values().stream().map(ContentSchema::registryName).collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         this.defaultContentFiles = BuiltInSchemas.sampleFiles();
     }
 
@@ -139,7 +140,7 @@ final class ContentServiceImpl implements EclipseApi.ContentService {
         }
 
         registryService.unfreezeAll();
-        for (String registryName : schemas.keySet()) {
+        for (String registryName : registryNames) {
             Collection<EclipseApi.GenericDefinition> definitions = stagedByRegistry.getOrDefault(registryName, Map.of()).values();
             registryService.registry(registryName, EclipseApi.GenericDefinition.class).replaceAll(definitions);
         }
@@ -147,7 +148,8 @@ final class ContentServiceImpl implements EclipseApi.ContentService {
 
         Map<String, Integer> registryCounts = new LinkedHashMap<>();
         Map<String, List<String>> loadedKeys = new LinkedHashMap<>();
-        stagedByRegistry.forEach((registryName, definitions) -> {
+        registryNames.forEach(registryName -> {
+            Map<String, EclipseApi.GenericDefinition> definitions = stagedByRegistry.getOrDefault(registryName, Map.of());
             registryCounts.put(registryName, definitions.size());
             loadedKeys.put(registryName, definitions.values().stream().map(EclipseApi.GenericDefinition::key).sorted().toList());
         });
@@ -212,10 +214,7 @@ final class ContentServiceImpl implements EclipseApi.ContentService {
         Path relative = root.relativize(path);
         if (relative.getNameCount() > 1) {
             String directoryName = relative.getName(0).toString().trim().toLowerCase(Locale.ROOT);
-            return schemas.values().stream()
-                    .filter(schema -> schema.directoryName().equalsIgnoreCase(directoryName))
-                    .findFirst()
-                    .orElse(null);
+            return schemas.get(directoryName);
         }
         return null;
     }

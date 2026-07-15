@@ -22,6 +22,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public final class EclipsePlugin extends JavaPlugin {
     private CoreRuntime.ModuleManager moduleManager;
@@ -80,9 +81,11 @@ final class EclipseCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 0) {
-            sender.sendMessage("§e/eclipse reload §7- reload module-backed config and content");
+            sender.sendMessage("§e/eclipse reload §7- reload all registered modules");
             sender.sendMessage("§e/eclipse module list §7- list module states");
             sender.sendMessage("§e/eclipse profile <player> §7- dump a cached Phase 1 profile");
+            sender.sendMessage("§e/eclipse content reload §7- validate and atomically hot-swap content registries");
+            sender.sendMessage("§e/eclipse content status §7- show current registry counts");
             return true;
         }
 
@@ -118,6 +121,30 @@ final class EclipseCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        if (args[0].equalsIgnoreCase("content") && args.length > 1 && args[1].equalsIgnoreCase("reload")) {
+            EclipseApi.ContentService contentService = moduleManager.context().services().require(EclipseApi.ContentService.class);
+            EclipseApi.ContentReloadResult result = contentService.reloadContent().join();
+            if (!result.success()) {
+                sender.sendMessage("§cContent reload failed with " + result.errors().size() + " error(s).");
+                result.errors().stream().limit(5).forEach(error -> sender.sendMessage("§7- §c" + error.code() + " §7" + error.message() + " §8@ " + error.sourcePath()));
+                return true;
+            }
+            sender.sendMessage("§aContent reload succeeded.");
+            for (Map.Entry<String, Integer> entry : result.registryCounts().entrySet()) {
+                sender.sendMessage("§7- §f" + entry.getKey() + ": §a" + entry.getValue());
+            }
+            return true;
+        }
+
+        if (args[0].equalsIgnoreCase("content") && args.length > 1 && args[1].equalsIgnoreCase("status")) {
+            EclipseApi.ContentReloadResult snapshot = moduleManager.context().services().require(EclipseApi.ContentService.class).currentSnapshot();
+            sender.sendMessage("§6Content snapshot @ §f" + snapshot.loadedAt());
+            for (Map.Entry<String, Integer> entry : snapshot.registryCounts().entrySet()) {
+                sender.sendMessage("§7- §f" + entry.getKey() + ": §a" + entry.getValue());
+            }
+            return true;
+        }
+
         sender.sendMessage("§cUnknown subcommand.");
         return true;
     }
@@ -125,7 +152,7 @@ final class EclipseCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return List.of("reload", "module", "profile");
+            return List.of("reload", "module", "profile", "content");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("module")) {
             return List.of("list");
@@ -135,6 +162,9 @@ final class EclipseCommand implements CommandExecutor, TabCompleter {
             EclipseApi.PlayerProfileService profileService = moduleManager.context().services().require(EclipseApi.PlayerProfileService.class);
             profileService.onlineProfiles().forEach(profile -> names.add(profile.lastKnownName()));
             return names;
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("content")) {
+            return List.of("reload", "status");
         }
         return List.of();
     }
