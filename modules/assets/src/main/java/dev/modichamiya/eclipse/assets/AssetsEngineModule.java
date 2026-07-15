@@ -48,14 +48,17 @@ final class AssetServiceImpl implements EclipseApi.AssetService {
     private final EclipseApi.ConfigService configService;
     private final EclipseApi.RegistryService registryService;
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
-    private final Map<String, String> sampleSourceFiles = Map.of(
-            "models/items/apprentice_staff.model.json", "{\n  \"parent\": \"minecraft:item/generated\",\n  \"textures\": {\n    \"layer0\": \"eclipse:item/apprentice_staff\"\n  }\n}\n",
-            "textures/gui/apprentice_staff_icon.txt", "placeholder icon asset for apprentice staff\n",
-            "textures/gui/stormbound_talisman_icon.txt", "placeholder icon asset for stormbound talisman\n",
-            "particles/arcane_bolt_charge.json", "{\n  \"emitter\": \"point\",\n  \"color\": \"#66ccff\"\n}\n",
-            "particles/chain_lightning_arc.json", "{\n  \"emitter\": \"line\",\n  \"color\": \"#99ffff\"\n}\n",
-            "sounds/arcane_cast.ogg.placeholder.txt", "placeholder sound source for arcane cast\n",
-            "sounds/chain_lightning.ogg.placeholder.txt", "placeholder sound source for chain lightning\n"
+    private final Map<String, String> sampleSourceFiles = Map.ofEntries(
+            Map.entry("models/items/apprentice_staff.model.json", "{\n  \"parent\": \"minecraft:item/generated\",\n  \"textures\": {\n    \"layer0\": \"eclipse:item/apprentice_staff\"\n  }\n}\n"),
+            Map.entry("textures/gui/apprentice_staff_icon.txt", "placeholder icon asset for apprentice staff\n"),
+            Map.entry("textures/gui/stormbound_talisman_icon.txt", "placeholder icon asset for stormbound talisman\n"),
+            Map.entry("textures/gui/character_sheet_bg.txt", "placeholder GUI background for the character sheet\n"),
+            Map.entry("textures/gui/region_title_overlay.txt", "placeholder overlay art for region title banner\n"),
+            Map.entry("particles/arcane_bolt_charge.json", "{\n  \"emitter\": \"point\",\n  \"color\": \"#66ccff\"\n}\n"),
+            Map.entry("particles/chain_lightning_arc.json", "{\n  \"emitter\": \"line\",\n  \"color\": \"#99ffff\"\n}\n"),
+            Map.entry("sounds/arcane_cast.ogg.placeholder.txt", "placeholder sound source for arcane cast\n"),
+            Map.entry("sounds/chain_lightning.ogg.placeholder.txt", "placeholder sound source for chain lightning\n"),
+            Map.entry("sounds/music/starter_kingdom.ogg.placeholder.txt", "placeholder looping music for starter kingdom\n")
     );
 
     private volatile EclipseApi.AssetBuildReport currentReport = EclipseApi.AssetBuildReport.empty();

@@ -139,11 +139,31 @@ public final class EclipseApi {
     }
 
     public interface GuiService {
-        String status();
+        GuiCatalog currentCatalog();
+
+        GuiOpenResult openPreview(String screenKey, String viewer, Map<String, String> initialBindings);
+
+        boolean close(long sessionId);
+
+        Collection<GuiSessionSnapshot> activeSessions();
+
+        default String status() {
+            return "screens=" + currentCatalog().definitions().size() + ", sessions=" + activeSessions().size();
+        }
     }
 
     public interface WorldService {
-        String status();
+        WorldCatalog currentCatalog();
+
+        Optional<WorldLookupResult> locate(String worldName, double x, double y, double z);
+
+        DimensionRequestResult requestInstance(String dimensionKey, String requester);
+
+        Collection<DimensionInstanceSnapshot> activeInstances();
+
+        default String status() {
+            return "regions=" + currentCatalog().regions().size() + ", dimensions=" + currentCatalog().dimensions().size() + ", activeInstances=" + activeInstances().size();
+        }
     }
 
     public interface AiService {
@@ -342,6 +362,175 @@ public final class EclipseApi {
             context = Map.copyOf(context);
             firedCallbacks = List.copyOf(firedCallbacks);
         }
+    }
+
+    public record GuiBinding(
+            String componentId,
+            String bindingKey,
+            String bindingType,
+            String defaultValue,
+            String formatter
+    ) {
+    }
+
+    public record GuiDefinition(
+            NamespacedKey key,
+            String displayName,
+            String screenType,
+            int width,
+            int height,
+            String backgroundAssetKey,
+            String openTimelineKey,
+            String closeTimelineKey,
+            List<GuiBinding> bindings,
+            Set<String> tags
+    ) {
+        public GuiDefinition {
+            bindings = List.copyOf(bindings);
+            tags = Set.copyOf(tags);
+        }
+    }
+
+    public record GuiCatalog(Instant generatedAt, Map<String, GuiDefinition> definitions) {
+        public GuiCatalog {
+            definitions = Map.copyOf(definitions);
+        }
+
+        public static GuiCatalog empty() {
+            return new GuiCatalog(Instant.EPOCH, Map.of());
+        }
+    }
+
+    public record GuiOpenResult(boolean success, String message, long sessionId) {
+    }
+
+    public record GuiSessionSnapshot(
+            long sessionId,
+            String screenKey,
+            String viewer,
+            String state,
+            Map<String, String> bindings,
+            List<String> timelinesTriggered
+    ) {
+        public GuiSessionSnapshot {
+            bindings = Map.copyOf(bindings);
+            timelinesTriggered = List.copyOf(timelinesTriggered);
+        }
+    }
+
+    public record ZoneDefinition(
+            String id,
+            String displayName,
+            int priority,
+            double minX,
+            double maxX,
+            double minY,
+            double maxY,
+            double minZ,
+            double maxZ,
+            boolean pvpEnabled,
+            String musicAssetKey,
+            Set<String> tags
+    ) {
+        public ZoneDefinition {
+            tags = Set.copyOf(tags);
+        }
+
+        public boolean contains(double x, double y, double z) {
+            return x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ && z <= maxZ;
+        }
+    }
+
+    public record RegionDefinition(
+            NamespacedKey key,
+            String displayName,
+            String worldName,
+            double minX,
+            double maxX,
+            double minY,
+            double maxY,
+            double minZ,
+            double maxZ,
+            String musicAssetKey,
+            String overlayScreenKey,
+            List<ZoneDefinition> zones,
+            Set<String> tags
+    ) {
+        public RegionDefinition {
+            zones = List.copyOf(zones);
+            tags = Set.copyOf(tags);
+        }
+
+        public boolean contains(double x, double y, double z) {
+            return x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ && z <= maxZ;
+        }
+    }
+
+    public record WarpDefinition(
+            NamespacedKey key,
+            String displayName,
+            String worldName,
+            double x,
+            double y,
+            double z,
+            float yaw,
+            float pitch,
+            String targetRegionKey,
+            Set<String> tags
+    ) {
+        public WarpDefinition {
+            tags = Set.copyOf(tags);
+        }
+    }
+
+    public record DimensionDefinition(
+            NamespacedKey key,
+            String displayName,
+            String templateName,
+            String environmentType,
+            int maxInstances,
+            String entryWarpKey,
+            Set<String> tags
+    ) {
+        public DimensionDefinition {
+            tags = Set.copyOf(tags);
+        }
+    }
+
+    public record WorldCatalog(
+            Instant generatedAt,
+            Map<String, RegionDefinition> regions,
+            Map<String, WarpDefinition> warps,
+            Map<String, DimensionDefinition> dimensions
+    ) {
+        public WorldCatalog {
+            regions = Map.copyOf(regions);
+            warps = Map.copyOf(warps);
+            dimensions = Map.copyOf(dimensions);
+        }
+
+        public static WorldCatalog empty() {
+            return new WorldCatalog(Instant.EPOCH, Map.of(), Map.of(), Map.of());
+        }
+    }
+
+    public record WorldLookupResult(String regionKey, List<String> zones, String overlayScreenKey, String musicAssetKey) {
+        public WorldLookupResult {
+            zones = List.copyOf(zones);
+        }
+    }
+
+    public record DimensionRequestResult(boolean success, String message, long instanceId) {
+    }
+
+    public record DimensionInstanceSnapshot(
+            long instanceId,
+            String dimensionKey,
+            String requester,
+            String state,
+            Instant createdAt,
+            String entryWarpKey
+    ) {
     }
 
     public record ProgressionScaffold(
