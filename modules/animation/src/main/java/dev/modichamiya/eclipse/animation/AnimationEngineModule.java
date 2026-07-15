@@ -132,19 +132,19 @@ final class TimelineServiceImpl implements EclipseApi.TimelineService {
         boolean debugCallbacks = configService.config("animation").booleanValue("debug-log-callbacks", true);
         List<Long> completed = new ArrayList<>();
         for (RuntimeInstance instance : activeInstances.values()) {
-            instance.currentTick++;
+            instance.advanceTick();
             for (EclipseApi.TimelineCue cue : instance.definition().cues()) {
-                if (cue.tick() == instance.currentTick) {
+                if (cue.tick() == instance.currentTick()) {
                     if (cue.trackType().equalsIgnoreCase("callback")) {
-                        instance.firedCallbacks.add(cue.label());
+                        instance.recordCallback(cue.label());
                         if (debugCallbacks) {
-                            context.logger("animation").info("Timeline callback fired: instance=" + instance.instanceId + ", timeline=" + instance.definition().key().asString() + ", callback=" + cue.label() + ", context=" + instance.context());
+                            context.logger("animation").info("Timeline callback fired: instance=" + instance.instanceId() + ", timeline=" + instance.definition().key().asString() + ", callback=" + cue.label() + ", context=" + instance.context());
                         }
                     }
                 }
             }
-            if (instance.currentTick >= instance.definition().durationTicks()) {
-                completed.add(instance.instanceId);
+            if (instance.currentTick() >= instance.definition().durationTicks()) {
+                completed.add(instance.instanceId());
             }
         }
         completed.forEach(activeInstances::remove);
@@ -155,9 +155,41 @@ final class TimelineServiceImpl implements EclipseApi.TimelineService {
     }
 }
 
-record RuntimeInstance(long instanceId, EclipseApi.TimelineDefinition definition, Map<String, String> context, List<String> firedCallbacks, int currentTick) {
+final class RuntimeInstance {
+    private final long instanceId;
+    private final EclipseApi.TimelineDefinition definition;
+    private final Map<String, String> context;
+    private final List<String> firedCallbacks = new ArrayList<>();
+    private int currentTick = -1;
+
     RuntimeInstance(long instanceId, EclipseApi.TimelineDefinition definition, Map<String, String> context) {
-        this(instanceId, definition, new LinkedHashMap<>(context), new ArrayList<>(), -1);
+        this.instanceId = instanceId;
+        this.definition = definition;
+        this.context = new LinkedHashMap<>(context);
+    }
+
+    long instanceId() {
+        return instanceId;
+    }
+
+    EclipseApi.TimelineDefinition definition() {
+        return definition;
+    }
+
+    Map<String, String> context() {
+        return context;
+    }
+
+    int currentTick() {
+        return currentTick;
+    }
+
+    void advanceTick() {
+        currentTick++;
+    }
+
+    void recordCallback(String callback) {
+        firedCallbacks.add(callback);
     }
 
     EclipseApi.TimelineInstanceSnapshot snapshot() {
