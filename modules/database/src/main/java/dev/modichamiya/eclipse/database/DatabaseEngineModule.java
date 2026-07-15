@@ -10,7 +10,6 @@ import dev.modichamiya.eclipse.core.CoreRuntime;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Objects;
@@ -52,7 +51,7 @@ public final class DatabaseEngineModule implements CoreRuntime.EngineModule {
         hikariConfig.setMaximumPoolSize(databaseConfig.intValue("pool-size", 8));
         hikariConfig.setConnectionTimeout(databaseConfig.longValue("connection-timeout-ms", 10000L));
         hikariConfig.setPoolName("EclipseSQLitePool");
-        hikariConfig.setConnectionInitSql("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;");
+        hikariConfig.setConnectionInitSql("PRAGMA foreign_keys = ON");
 
         this.dataSource = new HikariDataSource(hikariConfig);
         this.ioExecutor = Executors.newFixedThreadPool(Math.max(4, Runtime.getRuntime().availableProcessors() / 2));
@@ -76,6 +75,7 @@ public final class DatabaseEngineModule implements CoreRuntime.EngineModule {
     private void runMigrations(DatabaseServiceImpl databaseService) {
         try (Connection connection = databaseService.dataSource().getConnection();
              Statement statement = connection.createStatement()) {
+            statement.execute("PRAGMA journal_mode = WAL");
             statement.executeUpdate("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)");
 
             int currentVersion = 0;
