@@ -49,6 +49,7 @@ public final class ContentEngineModule implements CoreRuntime.EngineModule {
         if (!result.success()) {
             throw new IllegalStateException("Initial content load failed: " + result.errors());
         }
+        context.eventBus().publish(new EclipseApi.ContentReloadedEvent(result.loadedAt()));
         context.logger(id()).info("Content backbone online with registries " + result.registryCounts());
     }
 
@@ -313,6 +314,8 @@ final class BuiltInSchemas {
 
     static Map<String, ContentSchema> create() {
         Map<String, ContentSchema> schemas = new LinkedHashMap<>();
+        register(schemas, new AssetSchema());
+        register(schemas, new TimelineSchema());
         register(schemas, new AbilitySchema());
         register(schemas, new ItemSchema());
         register(schemas, new MobSchema());
@@ -323,9 +326,18 @@ final class BuiltInSchemas {
 
     static Map<String, String> sampleFiles() {
         Map<String, String> files = new LinkedHashMap<>();
+        files.put("assets/eclipse_model_apprentice_staff.yml", "type: asset\nkey: eclipse:model/apprentice_staff\nname: Apprentice Staff Model\nasset_kind: model\nsource: models/items/apprentice_staff.model.json\nlogical_path: assets/eclipse/models/items/apprentice_staff.json\ntags:\n  - model\n  - weapon\n");
+        files.put("assets/eclipse_icon_apprentice_staff.yml", "type: asset\nkey: eclipse:icon/apprentice_staff\nname: Apprentice Staff Icon\nasset_kind: icon\nsource: textures/gui/apprentice_staff_icon.txt\nlogical_path: assets/eclipse/textures/gui/apprentice_staff_icon.txt\ntags:\n  - icon\n  - ui\n");
+        files.put("assets/eclipse_icon_stormbound_talisman.yml", "type: asset\nkey: eclipse:icon/stormbound_talisman\nname: Stormbound Talisman Icon\nasset_kind: icon\nsource: textures/gui/stormbound_talisman_icon.txt\nlogical_path: assets/eclipse/textures/gui/stormbound_talisman_icon.txt\ntags:\n  - icon\n  - ui\n");
+        files.put("assets/eclipse_particle_arcane_bolt_charge.yml", "type: asset\nkey: eclipse:particle/arcane_bolt_charge\nname: Arcane Bolt Charge Particle\nasset_kind: particle\nsource: particles/arcane_bolt_charge.json\nlogical_path: assets/eclipse/particles/arcane_bolt_charge.json\ntags:\n  - particle\n  - spell\n");
+        files.put("assets/eclipse_particle_chain_lightning_arc.yml", "type: asset\nkey: eclipse:particle/chain_lightning_arc\nname: Chain Lightning Arc Particle\nasset_kind: particle\nsource: particles/chain_lightning_arc.json\nlogical_path: assets/eclipse/particles/chain_lightning_arc.json\ntags:\n  - particle\n  - lightning\n");
+        files.put("assets/eclipse_sound_arcane_cast.yml", "type: asset\nkey: eclipse:sound/arcane_cast\nname: Arcane Cast Sound\nasset_kind: sound\nsource: sounds/arcane_cast.ogg.placeholder.txt\nlogical_path: assets/eclipse/sounds/arcane_cast.ogg.placeholder.txt\ntags:\n  - sound\n  - spell\n");
+        files.put("assets/eclipse_sound_chain_lightning.yml", "type: asset\nkey: eclipse:sound/chain_lightning\nname: Chain Lightning Sound\nasset_kind: sound\nsource: sounds/chain_lightning.ogg.placeholder.txt\nlogical_path: assets/eclipse/sounds/chain_lightning.ogg.placeholder.txt\ntags:\n  - sound\n  - lightning\n");
+        files.put("timelines/eclipse_cast_arcane_bolt.yml", "type: timeline\nkey: eclipse:cast_arcane_bolt\nname: Cast Arcane Bolt\nduration_ticks: 16\ntracks:\n  - type: sound\n    tick: 0\n    asset: eclipse:sound/arcane_cast\n    label: cast_open\n  - type: particle\n    tick: 4\n    asset: eclipse:particle/arcane_bolt_charge\n    label: charge_ring\n  - type: callback\n    tick: 8\n    name: impact\n  - type: callback\n    tick: 15\n    name: cleanup\n");
+        files.put("timelines/eclipse_cast_chain_lightning.yml", "type: timeline\nkey: eclipse:cast_chain_lightning\nname: Cast Chain Lightning\nduration_ticks: 24\ntracks:\n  - type: sound\n    tick: 0\n    asset: eclipse:sound/chain_lightning\n    label: cast_open\n  - type: particle\n    tick: 6\n    asset: eclipse:particle/chain_lightning_arc\n    label: arc_trace\n  - type: callback\n    tick: 12\n    name: impact\n  - type: callback\n    tick: 23\n    name: cleanup\n");
         files.put("abilities/eclipse_arcane_bolt.yml", "type: ability\nkey: eclipse:arcane_bolt\nname: Arcane Bolt\ntimeline: eclipse:cast_arcane_bolt\nmana_cost: 15\ncooldown_seconds: 3.5\ntags:\n  - spell\n  - mage\n");
         files.put("abilities/eclipse_chain_lightning.yml", "type: ability\nkey: eclipse:chain_lightning\nname: Chain Lightning\ntimeline: eclipse:cast_chain_lightning\nmana_cost: 40\ncooldown_seconds: 10\ntags:\n  - spell\n  - storm\n  - mastery:staff\n");
-        files.put("items/eclipse_apprentice_staff.yml", "type: item\nkey: eclipse:apprentice_staff\nname: Apprentice Staff\nrarity: uncommon\nmodel: eclipse:item/apprentice_staff\nicon: eclipse:icon/apprentice_staff\nabilities:\n  - eclipse:arcane_bolt\n  - eclipse:chain_lightning\ntags:\n  - weapon\n  - staff\n  - starter\n");
+        files.put("items/eclipse_apprentice_staff.yml", "type: item\nkey: eclipse:apprentice_staff\nname: Apprentice Staff\nrarity: uncommon\nmodel: eclipse:model/apprentice_staff\nicon: eclipse:icon/apprentice_staff\nabilities:\n  - eclipse:arcane_bolt\n  - eclipse:chain_lightning\ntags:\n  - weapon\n  - staff\n  - starter\n");
         files.put("items/eclipse_stormbound_talisman.yml", "type: item\nkey: eclipse:stormbound_talisman\nname: Stormbound Talisman\nrarity: rare\nicon: eclipse:icon/stormbound_talisman\nabilities:\n  - eclipse:chain_lightning\ntags:\n  - accessory\n  - mage\n");
         files.put("loot_tables/eclipse_arcane_wisp.yml", "type: loot_table\nkey: eclipse:arcane_wisp_loot\nname: Arcane Wisp Loot\ndrops:\n  - key: eclipse:apprentice_staff\n    weight: 5\n    chance: 0.05\n  - key: eclipse:stormbound_talisman\n    weight: 15\n    chance: 0.2\n");
         files.put("mobs/eclipse_arcane_wisp.yml", "type: mob\nkey: eclipse:arcane_wisp\nname: Arcane Wisp\nlevel: 6\nbehavior: eclipse:basic_ranged_caster\nloot_table: eclipse:arcane_wisp_loot\nabilities:\n  - eclipse:arcane_bolt\ntags:\n  - starter_region\n  - magic\n");
@@ -338,6 +350,89 @@ final class BuiltInSchemas {
     private static void register(Map<String, ContentSchema> schemas, ContentSchema schema) {
         schemas.put(schema.registryName(), schema);
         schemas.put(schema.directoryName(), schema);
+    }
+}
+
+final class AssetSchema extends AbstractSchema {
+    @Override
+    public String registryName() {
+        return "asset";
+    }
+
+    @Override
+    public String directoryName() {
+        return "assets";
+    }
+
+    @Override
+    public EclipseApi.GenericDefinition parse(Map<String, Object> raw, EclipseApi.DefinitionSource source, String requiredNamespace, List<EclipseApi.ContentValidationError> errors) {
+        String rawKey = string(raw, "key", true, source, errors);
+        String name = Optional.ofNullable(string(raw, "name", true, source, errors)).orElse(rawKey);
+        String assetKind = string(raw, "asset_kind", true, source, errors);
+        String assetSource = string(raw, "source", true, source, errors);
+        String logicalPath = string(raw, "logical_path", true, source, errors);
+        if (rawKey == null || assetKind == null || assetSource == null || logicalPath == null) {
+            return null;
+        }
+        EclipseApi.NamespacedKey key = key(rawKey, requiredNamespace, source, errors);
+        if (key == null) {
+            return null;
+        }
+        return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), copyValues(raw), Map.of(), source);
+    }
+
+    @Override
+    public void validateReferences(EclipseApi.GenericDefinition definition, Map<String, Map<String, EclipseApi.GenericDefinition>> stagedByRegistry, List<EclipseApi.ContentValidationError> errors) {
+    }
+}
+
+final class TimelineSchema extends AbstractSchema {
+    @Override
+    public String registryName() {
+        return "timeline";
+    }
+
+    @Override
+    public String directoryName() {
+        return "timelines";
+    }
+
+    @Override
+    public EclipseApi.GenericDefinition parse(Map<String, Object> raw, EclipseApi.DefinitionSource source, String requiredNamespace, List<EclipseApi.ContentValidationError> errors) {
+        String rawKey = string(raw, "key", true, source, errors);
+        String name = Optional.ofNullable(string(raw, "name", true, source, errors)).orElse(rawKey);
+        Object durationRaw = raw.get("duration_ticks");
+        if (rawKey == null || durationRaw == null) {
+            errors.add(new EclipseApi.ContentValidationError("missing_field", "Timeline requires 'duration_ticks'", source.path(), rawKey == null ? "" : rawKey));
+            return null;
+        }
+        Object tracksRaw = raw.get("tracks");
+        if (!(tracksRaw instanceof List<?> list) || list.isEmpty()) {
+            errors.add(new EclipseApi.ContentValidationError("missing_field", "Timeline requires a non-empty 'tracks' list", source.path(), rawKey));
+            return null;
+        }
+        EclipseApi.NamespacedKey key = key(rawKey, requiredNamespace, source, errors);
+        if (key == null) {
+            return null;
+        }
+        List<EclipseApi.NamespacedKey> assetReferences = new ArrayList<>();
+        for (Object track : list) {
+            if (track instanceof Map<?, ?> map) {
+                Object asset = map.get("asset");
+                if (asset != null) {
+                    EclipseApi.NamespacedKey assetKey = key(String.valueOf(asset), requiredNamespace, source, errors);
+                    if (assetKey != null) {
+                        assetReferences.add(assetKey);
+                    }
+                }
+            }
+        }
+        return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), copyValues(raw), Map.of("assets", assetReferences), source);
+    }
+
+    @Override
+    public void validateReferences(EclipseApi.GenericDefinition definition, Map<String, Map<String, EclipseApi.GenericDefinition>> stagedByRegistry, List<EclipseApi.ContentValidationError> errors) {
+        requireReference("assets", definition, stagedByRegistry, "asset", errors);
     }
 }
 
@@ -361,17 +456,19 @@ final class AbilitySchema extends AbstractSchema {
             return null;
         }
         EclipseApi.NamespacedKey key = key(rawKey, requiredNamespace, source, errors);
-        if (key == null) {
+        EclipseApi.NamespacedKey timelineKey = key(timeline, requiredNamespace, source, errors);
+        if (key == null || timelineKey == null) {
             return null;
         }
         Map<String, Object> values = copyValues(raw);
         values.putIfAbsent("mana_cost", 0);
         values.putIfAbsent("cooldown_seconds", 0.0D);
-        return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), values, Map.of(), source);
+        return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), values, Map.of("timeline", List.of(timelineKey)), source);
     }
 
     @Override
     public void validateReferences(EclipseApi.GenericDefinition definition, Map<String, Map<String, EclipseApi.GenericDefinition>> stagedByRegistry, List<EclipseApi.ContentValidationError> errors) {
+        requireReference("timeline", definition, stagedByRegistry, "timeline", errors);
     }
 }
 
@@ -401,12 +498,29 @@ final class ItemSchema extends AbstractSchema {
                 .map(reference -> key(reference, requiredNamespace, source, errors))
                 .filter(Objects::nonNull)
                 .toList();
-        return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), copyValues(raw), Map.of("abilities", abilityRefs), source);
+        List<EclipseApi.NamespacedKey> assetRefs = new ArrayList<>();
+        if (raw.get("model") != null) {
+            EclipseApi.NamespacedKey model = key(String.valueOf(raw.get("model")), requiredNamespace, source, errors);
+            if (model != null) {
+                assetRefs.add(model);
+            }
+        }
+        if (raw.get("icon") != null) {
+            EclipseApi.NamespacedKey icon = key(String.valueOf(raw.get("icon")), requiredNamespace, source, errors);
+            if (icon != null) {
+                assetRefs.add(icon);
+            }
+        }
+        Map<String, List<EclipseApi.NamespacedKey>> references = new LinkedHashMap<>();
+        references.put("abilities", abilityRefs);
+        references.put("assets", assetRefs);
+        return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), copyValues(raw), references, source);
     }
 
     @Override
     public void validateReferences(EclipseApi.GenericDefinition definition, Map<String, Map<String, EclipseApi.GenericDefinition>> stagedByRegistry, List<EclipseApi.ContentValidationError> errors) {
         requireReference("abilities", definition, stagedByRegistry, "ability", errors);
+        requireReference("assets", definition, stagedByRegistry, "asset", errors);
     }
 }
 

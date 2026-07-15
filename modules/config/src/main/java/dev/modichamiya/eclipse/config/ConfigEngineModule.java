@@ -67,6 +67,21 @@ public final class ConfigEngineModule implements CoreRuntime.EngineModule {
                 "hot-reload-enabled", true
         ));
 
+        defaults.put("assets", Map.of(
+                "source-directory", "assets-src",
+                "output-directory", "generated-pack",
+                "manifest-name", "eclipse-pack-manifest.json",
+                "resource-pack-url", "",
+                "required", true,
+                "kick-on-decline", false
+        ));
+
+        defaults.put("animation", Map.of(
+                "debug-log-callbacks", true,
+                "max-active-instances", 256,
+                "auto-start-ticker", true
+        ));
+
         return defaults;
     }
 }

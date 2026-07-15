@@ -3,7 +3,6 @@ package dev.modichamiya.eclipse.api;
 import javax.sql.DataSource;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -113,11 +112,30 @@ public final class EclipseApi {
     }
 
     public interface AssetService {
-        String status();
+        CompletableFuture<AssetBuildReport> rebuildPack();
+
+        AssetBuildReport currentReport();
+
+        Collection<AssetDescriptor> assetIndex();
+
+        default String status() {
+            AssetBuildReport report = currentReport();
+            return "assets=" + report.assetCounts() + ", success=" + report.success();
+        }
     }
 
     public interface TimelineService {
-        String status();
+        TimelineCatalog currentCatalog();
+
+        TimelinePlayResult play(String timelineKey, Map<String, String> context);
+
+        boolean stop(long instanceId);
+
+        Collection<TimelineInstanceSnapshot> activeInstances();
+
+        default String status() {
+            return "timelines=" + currentCatalog().definitions().size() + ", active=" + activeInstances().size();
+        }
     }
 
     public interface GuiService {
@@ -232,6 +250,97 @@ public final class EclipseApi {
 
         public static ContentReloadResult empty() {
             return new ContentReloadResult(true, Instant.EPOCH, Map.of(), Map.of(), List.of());
+        }
+    }
+
+    public record AssetDescriptor(
+            NamespacedKey key,
+            String assetKind,
+            String sourcePath,
+            String logicalPath,
+            Set<String> tags,
+            Map<String, Object> metadata
+    ) {
+        public AssetDescriptor {
+            tags = Set.copyOf(tags);
+            metadata = Map.copyOf(metadata);
+        }
+    }
+
+    public record AssetBuildReport(
+            boolean success,
+            Instant builtAt,
+            Map<String, Integer> assetCounts,
+            List<String> missingSources,
+            List<String> duplicateLogicalPaths,
+            String outputDirectory,
+            String manifestFile,
+            String resourcePackUrl
+    ) {
+        public AssetBuildReport {
+            assetCounts = Map.copyOf(assetCounts);
+            missingSources = List.copyOf(missingSources);
+            duplicateLogicalPaths = List.copyOf(duplicateLogicalPaths);
+        }
+
+        public static AssetBuildReport empty() {
+            return new AssetBuildReport(true, Instant.EPOCH, Map.of(), List.of(), List.of(), "", "", "");
+        }
+    }
+
+    public record TimelineCue(
+            int tick,
+            String trackType,
+            String label,
+            String assetKey,
+            Map<String, Object> data
+    ) {
+        public TimelineCue {
+            data = Map.copyOf(data);
+        }
+    }
+
+    public record TimelineDefinition(
+            NamespacedKey key,
+            String displayName,
+            int durationTicks,
+            List<TimelineCue> cues,
+            Set<String> tags
+    ) {
+        public TimelineDefinition {
+            cues = List.copyOf(cues);
+            tags = Set.copyOf(tags);
+        }
+    }
+
+    public record TimelineCatalog(Instant generatedAt, Map<String, TimelineDefinition> definitions) {
+        public TimelineCatalog {
+            definitions = Map.copyOf(definitions);
+        }
+
+        public static TimelineCatalog empty() {
+            return new TimelineCatalog(Instant.EPOCH, Map.of());
+        }
+    }
+
+    public record TimelinePlayResult(boolean success, String message, long instanceId, List<String> callbacks) {
+        public TimelinePlayResult {
+            callbacks = List.copyOf(callbacks);
+        }
+    }
+
+    public record TimelineInstanceSnapshot(
+            long instanceId,
+            String timelineKey,
+            int currentTick,
+            int durationTicks,
+            String state,
+            Map<String, String> context,
+            List<String> firedCallbacks
+    ) {
+        public TimelineInstanceSnapshot {
+            context = Map.copyOf(context);
+            firedCallbacks = List.copyOf(firedCallbacks);
         }
     }
 

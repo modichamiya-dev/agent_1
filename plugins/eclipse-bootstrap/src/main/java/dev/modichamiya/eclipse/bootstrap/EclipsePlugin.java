@@ -84,8 +84,9 @@ final class EclipseCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("§e/eclipse reload §7- reload all registered modules");
             sender.sendMessage("§e/eclipse module list §7- list module states");
             sender.sendMessage("§e/eclipse profile <player> §7- dump a cached Phase 1 profile");
-            sender.sendMessage("§e/eclipse content reload §7- validate and atomically hot-swap content registries");
-            sender.sendMessage("§e/eclipse content status §7- show current registry counts");
+            sender.sendMessage("§e/eclipse content reload|status §7- manage content registries");
+            sender.sendMessage("§e/eclipse assets build|status §7- build and inspect the generated pack manifest");
+            sender.sendMessage("§e/eclipse timeline status|play <key> §7- inspect or preview timelines");
             return true;
         }
 
@@ -121,7 +122,28 @@ final class EclipseCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (args[0].equalsIgnoreCase("content") && args.length > 1 && args[1].equalsIgnoreCase("reload")) {
+        if (args[0].equalsIgnoreCase("content")) {
+            return handleContentCommands(sender, args);
+        }
+
+        if (args[0].equalsIgnoreCase("assets")) {
+            return handleAssetCommands(sender, args);
+        }
+
+        if (args[0].equalsIgnoreCase("timeline")) {
+            return handleTimelineCommands(sender, args);
+        }
+
+        sender.sendMessage("§cUnknown subcommand.");
+        return true;
+    }
+
+    private boolean handleContentCommands(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage("§cUsage: /eclipse content <reload|status>");
+            return true;
+        }
+        if (args[1].equalsIgnoreCase("reload")) {
             EclipseApi.ContentService contentService = moduleManager.context().services().require(EclipseApi.ContentService.class);
             EclipseApi.ContentReloadResult result = contentService.reloadContent().join();
             if (!result.success()) {
@@ -135,8 +157,7 @@ final class EclipseCommand implements CommandExecutor, TabCompleter {
             }
             return true;
         }
-
-        if (args[0].equalsIgnoreCase("content") && args.length > 1 && args[1].equalsIgnoreCase("status")) {
+        if (args[1].equalsIgnoreCase("status")) {
             EclipseApi.ContentReloadResult snapshot = moduleManager.context().services().require(EclipseApi.ContentService.class).currentSnapshot();
             sender.sendMessage("§6Content snapshot @ §f" + snapshot.loadedAt());
             for (Map.Entry<String, Integer> entry : snapshot.registryCounts().entrySet()) {
@@ -144,15 +165,68 @@ final class EclipseCommand implements CommandExecutor, TabCompleter {
             }
             return true;
         }
+        sender.sendMessage("§cUsage: /eclipse content <reload|status>");
+        return true;
+    }
 
-        sender.sendMessage("§cUnknown subcommand.");
+    private boolean handleAssetCommands(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage("§cUsage: /eclipse assets <build|status>");
+            return true;
+        }
+        EclipseApi.AssetService assetService = moduleManager.context().services().require(EclipseApi.AssetService.class);
+        if (args[1].equalsIgnoreCase("build")) {
+            EclipseApi.AssetBuildReport report = assetService.rebuildPack().join();
+            sender.sendMessage((report.success() ? "§a" : "§c") + "Asset build finished. success=" + report.success());
+            sender.sendMessage("§7Manifest: §f" + report.manifestFile());
+            sender.sendMessage("§7Output: §f" + report.outputDirectory());
+            sender.sendMessage("§7Counts: §f" + report.assetCounts());
+            if (!report.missingSources().isEmpty()) {
+                report.missingSources().stream().limit(5).forEach(line -> sender.sendMessage("§cMissing: §7" + line));
+            }
+            if (!report.duplicateLogicalPaths().isEmpty()) {
+                report.duplicateLogicalPaths().stream().limit(5).forEach(line -> sender.sendMessage("§cDuplicate logical path: §7" + line));
+            }
+            return true;
+        }
+        if (args[1].equalsIgnoreCase("status")) {
+            EclipseApi.AssetBuildReport report = assetService.currentReport();
+            sender.sendMessage("§6Asset build snapshot @ §f" + report.builtAt());
+            sender.sendMessage("§7Success: §f" + report.success());
+            sender.sendMessage("§7Counts: §f" + report.assetCounts());
+            sender.sendMessage("§7Manifest: §f" + report.manifestFile());
+            return true;
+        }
+        sender.sendMessage("§cUsage: /eclipse assets <build|status>");
+        return true;
+    }
+
+    private boolean handleTimelineCommands(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage("§cUsage: /eclipse timeline <status|play <key>>");
+            return true;
+        }
+        EclipseApi.TimelineService timelineService = moduleManager.context().services().require(EclipseApi.TimelineService.class);
+        if (args[1].equalsIgnoreCase("status")) {
+            EclipseApi.TimelineCatalog catalog = timelineService.currentCatalog();
+            sender.sendMessage("§6Timeline catalog @ §f" + catalog.generatedAt());
+            sender.sendMessage("§7Registered timelines: §f" + catalog.definitions().size());
+            sender.sendMessage("§7Active instances: §f" + timelineService.activeInstances().size());
+            return true;
+        }
+        if (args[1].equalsIgnoreCase("play") && args.length > 2) {
+            EclipseApi.TimelinePlayResult result = timelineService.play(args[2], Map.of("sender", sender.getName()));
+            sender.sendMessage((result.success() ? "§a" : "§c") + result.message() + " §7instance=" + result.instanceId());
+            return true;
+        }
+        sender.sendMessage("§cUsage: /eclipse timeline <status|play <key>>");
         return true;
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return List.of("reload", "module", "profile", "content");
+            return List.of("reload", "module", "profile", "content", "assets", "timeline");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("module")) {
             return List.of("list");
@@ -165,6 +239,15 @@ final class EclipseCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("content")) {
             return List.of("reload", "status");
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("assets")) {
+            return List.of("build", "status");
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("timeline")) {
+            return List.of("status", "play");
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("timeline") && args[1].equalsIgnoreCase("play")) {
+            return new ArrayList<>(moduleManager.context().services().require(EclipseApi.TimelineService.class).currentCatalog().definitions().keySet());
         }
         return List.of();
     }
