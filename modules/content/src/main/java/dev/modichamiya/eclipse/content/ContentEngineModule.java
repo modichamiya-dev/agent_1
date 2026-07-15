@@ -316,6 +316,10 @@ final class BuiltInSchemas {
         Map<String, ContentSchema> schemas = new LinkedHashMap<>();
         register(schemas, new AssetSchema());
         register(schemas, new TimelineSchema());
+        register(schemas, new GuiScreenSchema());
+        register(schemas, new RegionSchema());
+        register(schemas, new WarpSchema());
+        register(schemas, new DimensionSchema());
         register(schemas, new AbilitySchema());
         register(schemas, new ItemSchema());
         register(schemas, new MobSchema());
@@ -329,12 +333,22 @@ final class BuiltInSchemas {
         files.put("assets/eclipse_model_apprentice_staff.yml", "type: asset\nkey: eclipse:model/apprentice_staff\nname: Apprentice Staff Model\nasset_kind: model\nsource: models/items/apprentice_staff.model.json\nlogical_path: assets/eclipse/models/items/apprentice_staff.json\ntags:\n  - model\n  - weapon\n");
         files.put("assets/eclipse_icon_apprentice_staff.yml", "type: asset\nkey: eclipse:icon/apprentice_staff\nname: Apprentice Staff Icon\nasset_kind: icon\nsource: textures/gui/apprentice_staff_icon.txt\nlogical_path: assets/eclipse/textures/gui/apprentice_staff_icon.txt\ntags:\n  - icon\n  - ui\n");
         files.put("assets/eclipse_icon_stormbound_talisman.yml", "type: asset\nkey: eclipse:icon/stormbound_talisman\nname: Stormbound Talisman Icon\nasset_kind: icon\nsource: textures/gui/stormbound_talisman_icon.txt\nlogical_path: assets/eclipse/textures/gui/stormbound_talisman_icon.txt\ntags:\n  - icon\n  - ui\n");
+        files.put("assets/eclipse_gui_character_sheet_bg.yml", "type: asset\nkey: eclipse:ui/character_sheet_bg\nname: Character Sheet Background\nasset_kind: gui_background\nsource: textures/gui/character_sheet_bg.txt\nlogical_path: assets/eclipse/textures/gui/character_sheet_bg.txt\ntags:\n  - gui\n  - background\n");
+        files.put("assets/eclipse_gui_region_title_overlay.yml", "type: asset\nkey: eclipse:ui/region_title_overlay\nname: Region Title Overlay\nasset_kind: overlay\nsource: textures/gui/region_title_overlay.txt\nlogical_path: assets/eclipse/textures/gui/region_title_overlay.txt\ntags:\n  - gui\n  - overlay\n");
+        files.put("assets/eclipse_music_starter_kingdom.yml", "type: asset\nkey: eclipse:music/starter_kingdom\nname: Starter Kingdom Music\nasset_kind: music\nsource: sounds/music/starter_kingdom.ogg.placeholder.txt\nlogical_path: assets/eclipse/sounds/music/starter_kingdom.ogg.placeholder.txt\ntags:\n  - music\n  - region\n");
         files.put("assets/eclipse_particle_arcane_bolt_charge.yml", "type: asset\nkey: eclipse:particle/arcane_bolt_charge\nname: Arcane Bolt Charge Particle\nasset_kind: particle\nsource: particles/arcane_bolt_charge.json\nlogical_path: assets/eclipse/particles/arcane_bolt_charge.json\ntags:\n  - particle\n  - spell\n");
         files.put("assets/eclipse_particle_chain_lightning_arc.yml", "type: asset\nkey: eclipse:particle/chain_lightning_arc\nname: Chain Lightning Arc Particle\nasset_kind: particle\nsource: particles/chain_lightning_arc.json\nlogical_path: assets/eclipse/particles/chain_lightning_arc.json\ntags:\n  - particle\n  - lightning\n");
         files.put("assets/eclipse_sound_arcane_cast.yml", "type: asset\nkey: eclipse:sound/arcane_cast\nname: Arcane Cast Sound\nasset_kind: sound\nsource: sounds/arcane_cast.ogg.placeholder.txt\nlogical_path: assets/eclipse/sounds/arcane_cast.ogg.placeholder.txt\ntags:\n  - sound\n  - spell\n");
         files.put("assets/eclipse_sound_chain_lightning.yml", "type: asset\nkey: eclipse:sound/chain_lightning\nname: Chain Lightning Sound\nasset_kind: sound\nsource: sounds/chain_lightning.ogg.placeholder.txt\nlogical_path: assets/eclipse/sounds/chain_lightning.ogg.placeholder.txt\ntags:\n  - sound\n  - lightning\n");
         files.put("timelines/eclipse_cast_arcane_bolt.yml", "type: timeline\nkey: eclipse:cast_arcane_bolt\nname: Cast Arcane Bolt\nduration_ticks: 16\ntracks:\n  - type: sound\n    tick: 0\n    asset: eclipse:sound/arcane_cast\n    label: cast_open\n  - type: particle\n    tick: 4\n    asset: eclipse:particle/arcane_bolt_charge\n    label: charge_ring\n  - type: callback\n    tick: 8\n    name: impact\n  - type: callback\n    tick: 15\n    name: cleanup\n");
         files.put("timelines/eclipse_cast_chain_lightning.yml", "type: timeline\nkey: eclipse:cast_chain_lightning\nname: Cast Chain Lightning\nduration_ticks: 24\ntracks:\n  - type: sound\n    tick: 0\n    asset: eclipse:sound/chain_lightning\n    label: cast_open\n  - type: particle\n    tick: 6\n    asset: eclipse:particle/chain_lightning_arc\n    label: arc_trace\n  - type: callback\n    tick: 12\n    name: impact\n  - type: callback\n    tick: 23\n    name: cleanup\n");
+        files.put("timelines/eclipse_gui_character_sheet_open.yml", "type: timeline\nkey: eclipse:gui_character_sheet_open\nname: Character Sheet Open\nduration_ticks: 10\ntracks:\n  - type: callback\n    tick: 0\n    name: pre_open\n  - type: callback\n    tick: 5\n    name: populate\n  - type: callback\n    tick: 9\n    name: settle\n");
+        files.put("timelines/eclipse_gui_character_sheet_close.yml", "type: timeline\nkey: eclipse:gui_character_sheet_close\nname: Character Sheet Close\nduration_ticks: 6\ntracks:\n  - type: callback\n    tick: 0\n    name: fade\n  - type: callback\n    tick: 5\n    name: cleanup\n");
+        files.put("gui_screens/eclipse_character_sheet.yml", "type: gui_screen\nkey: eclipse:character_sheet\nname: Character Sheet\nscreen_type: menu\nwidth: 9\nheight: 6\nbackground_asset: eclipse:ui/character_sheet_bg\nopen_timeline: eclipse:gui_character_sheet_open\nclose_timeline: eclipse:gui_character_sheet_close\nbindings:\n  - component_id: level_label\n    binding_key: player.level\n    binding_type: text\n    default: '1'\n    formatter: raw\n  - component_id: mana_label\n    binding_key: player.mana\n    binding_type: text\n    default: '100/100'\n    formatter: raw\n  - component_id: title_label\n    binding_key: player.title\n    binding_type: text\n    default: Novice\n    formatter: uppercase\ntags:\n  - ui\n  - character\n");
+        files.put("gui_screens/eclipse_region_title_overlay.yml", "type: gui_screen\nkey: eclipse:region_title_overlay\nname: Region Title Overlay\nscreen_type: overlay\nwidth: 9\nheight: 1\nbackground_asset: eclipse:ui/region_title_overlay\nbindings:\n  - component_id: region_name\n    binding_key: region.name\n    binding_type: text\n    default: Starter Kingdom\n    formatter: title\ntags:\n  - ui\n  - overlay\n");
+        files.put("regions/eclipse_starter_kingdom.yml", "type: region\nkey: eclipse:starter_kingdom\nname: Starter Kingdom\nworld: world\nmin_x: -200\nmax_x: 200\nmin_y: 0\nmax_y: 255\nmin_z: -200\nmax_z: 200\nmusic_asset: eclipse:music/starter_kingdom\noverlay_screen: eclipse:region_title_overlay\nzones:\n  - id: town_square\n    name: Town Square\n    priority: 10\n    min_x: -40\n    max_x: 40\n    min_y: 60\n    max_y: 120\n    min_z: -40\n    max_z: 40\n    pvp_enabled: false\n    tags:\n      - safe_zone\n  - id: practice_field\n    name: Practice Field\n    priority: 5\n    min_x: 50\n    max_x: 120\n    min_y: 60\n    max_y: 120\n    min_z: 20\n    max_z: 90\n    pvp_enabled: false\n    tags:\n      - combat_intro\ntags:\n  - starter\n  - kingdom\n");
+        files.put("warps/eclipse_starter_spawn.yml", "type: warp\nkey: eclipse:starter_spawn\nname: Starter Spawn\nworld: world\nx: 0\ny: 80\nz: 0\nyaw: 0\npitch: 0\ntarget_region: eclipse:starter_kingdom\ntags:\n  - starter\n  - safe\n");
+        files.put("dimensions/eclipse_frozen_crypt.yml", "type: dimension\nkey: eclipse:frozen_crypt\nname: Frozen Crypt\ntemplate_name: frozen_crypt_template\nenvironment_type: NORMAL\nmax_instances: 4\nentry_warp: eclipse:starter_spawn\ntags:\n  - dungeon\n  - early_game\n");
         files.put("abilities/eclipse_arcane_bolt.yml", "type: ability\nkey: eclipse:arcane_bolt\nname: Arcane Bolt\ntimeline: eclipse:cast_arcane_bolt\nmana_cost: 15\ncooldown_seconds: 3.5\ntags:\n  - spell\n  - mage\n");
         files.put("abilities/eclipse_chain_lightning.yml", "type: ability\nkey: eclipse:chain_lightning\nname: Chain Lightning\ntimeline: eclipse:cast_chain_lightning\nmana_cost: 40\ncooldown_seconds: 10\ntags:\n  - spell\n  - storm\n  - mastery:staff\n");
         files.put("items/eclipse_apprentice_staff.yml", "type: item\nkey: eclipse:apprentice_staff\nname: Apprentice Staff\nrarity: uncommon\nmodel: eclipse:model/apprentice_staff\nicon: eclipse:icon/apprentice_staff\nabilities:\n  - eclipse:arcane_bolt\n  - eclipse:chain_lightning\ntags:\n  - weapon\n  - staff\n  - starter\n");
@@ -355,15 +369,9 @@ final class BuiltInSchemas {
 
 final class AssetSchema extends AbstractSchema {
     @Override
-    public String registryName() {
-        return "asset";
-    }
-
+    public String registryName() { return "asset"; }
     @Override
-    public String directoryName() {
-        return "assets";
-    }
-
+    public String directoryName() { return "assets"; }
     @Override
     public EclipseApi.GenericDefinition parse(Map<String, Object> raw, EclipseApi.DefinitionSource source, String requiredNamespace, List<EclipseApi.ContentValidationError> errors) {
         String rawKey = string(raw, "key", true, source, errors);
@@ -371,101 +379,189 @@ final class AssetSchema extends AbstractSchema {
         String assetKind = string(raw, "asset_kind", true, source, errors);
         String assetSource = string(raw, "source", true, source, errors);
         String logicalPath = string(raw, "logical_path", true, source, errors);
-        if (rawKey == null || assetKind == null || assetSource == null || logicalPath == null) {
-            return null;
-        }
+        if (rawKey == null || assetKind == null || assetSource == null || logicalPath == null) return null;
         EclipseApi.NamespacedKey key = key(rawKey, requiredNamespace, source, errors);
-        if (key == null) {
-            return null;
-        }
+        if (key == null) return null;
         return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), copyValues(raw), Map.of(), source);
     }
-
     @Override
-    public void validateReferences(EclipseApi.GenericDefinition definition, Map<String, Map<String, EclipseApi.GenericDefinition>> stagedByRegistry, List<EclipseApi.ContentValidationError> errors) {
-    }
+    public void validateReferences(EclipseApi.GenericDefinition definition, Map<String, Map<String, EclipseApi.GenericDefinition>> stagedByRegistry, List<EclipseApi.ContentValidationError> errors) { }
 }
 
 final class TimelineSchema extends AbstractSchema {
     @Override
-    public String registryName() {
-        return "timeline";
-    }
-
+    public String registryName() { return "timeline"; }
     @Override
-    public String directoryName() {
-        return "timelines";
-    }
-
+    public String directoryName() { return "timelines"; }
     @Override
     public EclipseApi.GenericDefinition parse(Map<String, Object> raw, EclipseApi.DefinitionSource source, String requiredNamespace, List<EclipseApi.ContentValidationError> errors) {
         String rawKey = string(raw, "key", true, source, errors);
         String name = Optional.ofNullable(string(raw, "name", true, source, errors)).orElse(rawKey);
         Object durationRaw = raw.get("duration_ticks");
+        Object tracksRaw = raw.get("tracks");
         if (rawKey == null || durationRaw == null) {
             errors.add(new EclipseApi.ContentValidationError("missing_field", "Timeline requires 'duration_ticks'", source.path(), rawKey == null ? "" : rawKey));
             return null;
         }
-        Object tracksRaw = raw.get("tracks");
         if (!(tracksRaw instanceof List<?> list) || list.isEmpty()) {
             errors.add(new EclipseApi.ContentValidationError("missing_field", "Timeline requires a non-empty 'tracks' list", source.path(), rawKey));
             return null;
         }
         EclipseApi.NamespacedKey key = key(rawKey, requiredNamespace, source, errors);
-        if (key == null) {
-            return null;
-        }
+        if (key == null) return null;
         List<EclipseApi.NamespacedKey> assetReferences = new ArrayList<>();
         for (Object track : list) {
             if (track instanceof Map<?, ?> map) {
                 Object asset = map.get("asset");
                 if (asset != null) {
                     EclipseApi.NamespacedKey assetKey = key(String.valueOf(asset), requiredNamespace, source, errors);
-                    if (assetKey != null) {
-                        assetReferences.add(assetKey);
-                    }
+                    if (assetKey != null) assetReferences.add(assetKey);
                 }
             }
         }
         return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), copyValues(raw), Map.of("assets", assetReferences), source);
     }
-
     @Override
     public void validateReferences(EclipseApi.GenericDefinition definition, Map<String, Map<String, EclipseApi.GenericDefinition>> stagedByRegistry, List<EclipseApi.ContentValidationError> errors) {
         requireReference("assets", definition, stagedByRegistry, "asset", errors);
     }
 }
 
+final class GuiScreenSchema extends AbstractSchema {
+    @Override
+    public String registryName() { return "gui_screen"; }
+    @Override
+    public String directoryName() { return "gui_screens"; }
+    @Override
+    public EclipseApi.GenericDefinition parse(Map<String, Object> raw, EclipseApi.DefinitionSource source, String requiredNamespace, List<EclipseApi.ContentValidationError> errors) {
+        String rawKey = string(raw, "key", true, source, errors);
+        String name = Optional.ofNullable(string(raw, "name", true, source, errors)).orElse(rawKey);
+        if (rawKey == null) return null;
+        EclipseApi.NamespacedKey key = key(rawKey, requiredNamespace, source, errors);
+        if (key == null) return null;
+        List<EclipseApi.NamespacedKey> assets = new ArrayList<>();
+        List<EclipseApi.NamespacedKey> timelines = new ArrayList<>();
+        if (raw.get("background_asset") != null) {
+            EclipseApi.NamespacedKey ref = key(String.valueOf(raw.get("background_asset")), requiredNamespace, source, errors);
+            if (ref != null) assets.add(ref);
+        }
+        if (raw.get("open_timeline") != null) {
+            EclipseApi.NamespacedKey ref = key(String.valueOf(raw.get("open_timeline")), requiredNamespace, source, errors);
+            if (ref != null) timelines.add(ref);
+        }
+        if (raw.get("close_timeline") != null) {
+            EclipseApi.NamespacedKey ref = key(String.valueOf(raw.get("close_timeline")), requiredNamespace, source, errors);
+            if (ref != null) timelines.add(ref);
+        }
+        return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), copyValues(raw), Map.of("assets", assets, "timelines", timelines), source);
+    }
+    @Override
+    public void validateReferences(EclipseApi.GenericDefinition definition, Map<String, Map<String, EclipseApi.GenericDefinition>> stagedByRegistry, List<EclipseApi.ContentValidationError> errors) {
+        requireReference("assets", definition, stagedByRegistry, "asset", errors);
+        requireReference("timelines", definition, stagedByRegistry, "timeline", errors);
+    }
+}
+
+final class RegionSchema extends AbstractSchema {
+    @Override
+    public String registryName() { return "region"; }
+    @Override
+    public String directoryName() { return "regions"; }
+    @Override
+    public EclipseApi.GenericDefinition parse(Map<String, Object> raw, EclipseApi.DefinitionSource source, String requiredNamespace, List<EclipseApi.ContentValidationError> errors) {
+        String rawKey = string(raw, "key", true, source, errors);
+        String name = Optional.ofNullable(string(raw, "name", true, source, errors)).orElse(rawKey);
+        if (rawKey == null) return null;
+        EclipseApi.NamespacedKey key = key(rawKey, requiredNamespace, source, errors);
+        if (key == null) return null;
+        List<EclipseApi.NamespacedKey> assets = new ArrayList<>();
+        List<EclipseApi.NamespacedKey> screens = new ArrayList<>();
+        if (raw.get("music_asset") != null) {
+            EclipseApi.NamespacedKey ref = key(String.valueOf(raw.get("music_asset")), requiredNamespace, source, errors);
+            if (ref != null) assets.add(ref);
+        }
+        if (raw.get("overlay_screen") != null) {
+            EclipseApi.NamespacedKey ref = key(String.valueOf(raw.get("overlay_screen")), requiredNamespace, source, errors);
+            if (ref != null) screens.add(ref);
+        }
+        return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), copyValues(raw), Map.of("assets", assets, "gui_screens", screens), source);
+    }
+    @Override
+    public void validateReferences(EclipseApi.GenericDefinition definition, Map<String, Map<String, EclipseApi.GenericDefinition>> stagedByRegistry, List<EclipseApi.ContentValidationError> errors) {
+        requireReference("assets", definition, stagedByRegistry, "asset", errors);
+        requireReference("gui_screens", definition, stagedByRegistry, "gui_screen", errors);
+    }
+}
+
+final class WarpSchema extends AbstractSchema {
+    @Override
+    public String registryName() { return "warp"; }
+    @Override
+    public String directoryName() { return "warps"; }
+    @Override
+    public EclipseApi.GenericDefinition parse(Map<String, Object> raw, EclipseApi.DefinitionSource source, String requiredNamespace, List<EclipseApi.ContentValidationError> errors) {
+        String rawKey = string(raw, "key", true, source, errors);
+        String name = Optional.ofNullable(string(raw, "name", true, source, errors)).orElse(rawKey);
+        if (rawKey == null) return null;
+        EclipseApi.NamespacedKey key = key(rawKey, requiredNamespace, source, errors);
+        if (key == null) return null;
+        List<EclipseApi.NamespacedKey> regions = new ArrayList<>();
+        if (raw.get("target_region") != null) {
+            EclipseApi.NamespacedKey ref = key(String.valueOf(raw.get("target_region")), requiredNamespace, source, errors);
+            if (ref != null) regions.add(ref);
+        }
+        return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), copyValues(raw), Map.of("regions", regions), source);
+    }
+    @Override
+    public void validateReferences(EclipseApi.GenericDefinition definition, Map<String, Map<String, EclipseApi.GenericDefinition>> stagedByRegistry, List<EclipseApi.ContentValidationError> errors) {
+        requireReference("regions", definition, stagedByRegistry, "region", errors);
+    }
+}
+
+final class DimensionSchema extends AbstractSchema {
+    @Override
+    public String registryName() { return "dimension"; }
+    @Override
+    public String directoryName() { return "dimensions"; }
+    @Override
+    public EclipseApi.GenericDefinition parse(Map<String, Object> raw, EclipseApi.DefinitionSource source, String requiredNamespace, List<EclipseApi.ContentValidationError> errors) {
+        String rawKey = string(raw, "key", true, source, errors);
+        String name = Optional.ofNullable(string(raw, "name", true, source, errors)).orElse(rawKey);
+        if (rawKey == null) return null;
+        EclipseApi.NamespacedKey key = key(rawKey, requiredNamespace, source, errors);
+        if (key == null) return null;
+        List<EclipseApi.NamespacedKey> warps = new ArrayList<>();
+        if (raw.get("entry_warp") != null) {
+            EclipseApi.NamespacedKey ref = key(String.valueOf(raw.get("entry_warp")), requiredNamespace, source, errors);
+            if (ref != null) warps.add(ref);
+        }
+        return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), copyValues(raw), Map.of("warps", warps), source);
+    }
+    @Override
+    public void validateReferences(EclipseApi.GenericDefinition definition, Map<String, Map<String, EclipseApi.GenericDefinition>> stagedByRegistry, List<EclipseApi.ContentValidationError> errors) {
+        requireReference("warps", definition, stagedByRegistry, "warp", errors);
+    }
+}
+
 final class AbilitySchema extends AbstractSchema {
     @Override
-    public String registryName() {
-        return "ability";
-    }
-
+    public String registryName() { return "ability"; }
     @Override
-    public String directoryName() {
-        return "abilities";
-    }
-
+    public String directoryName() { return "abilities"; }
     @Override
     public EclipseApi.GenericDefinition parse(Map<String, Object> raw, EclipseApi.DefinitionSource source, String requiredNamespace, List<EclipseApi.ContentValidationError> errors) {
         String rawKey = string(raw, "key", true, source, errors);
         String name = Optional.ofNullable(string(raw, "name", true, source, errors)).orElse(rawKey);
         String timeline = string(raw, "timeline", true, source, errors);
-        if (rawKey == null || timeline == null) {
-            return null;
-        }
+        if (rawKey == null || timeline == null) return null;
         EclipseApi.NamespacedKey key = key(rawKey, requiredNamespace, source, errors);
         EclipseApi.NamespacedKey timelineKey = key(timeline, requiredNamespace, source, errors);
-        if (key == null || timelineKey == null) {
-            return null;
-        }
+        if (key == null || timelineKey == null) return null;
         Map<String, Object> values = copyValues(raw);
         values.putIfAbsent("mana_cost", 0);
         values.putIfAbsent("cooldown_seconds", 0.0D);
         return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), values, Map.of("timeline", List.of(timelineKey)), source);
     }
-
     @Override
     public void validateReferences(EclipseApi.GenericDefinition definition, Map<String, Map<String, EclipseApi.GenericDefinition>> stagedByRegistry, List<EclipseApi.ContentValidationError> errors) {
         requireReference("timeline", definition, stagedByRegistry, "timeline", errors);
@@ -474,49 +570,28 @@ final class AbilitySchema extends AbstractSchema {
 
 final class ItemSchema extends AbstractSchema {
     @Override
-    public String registryName() {
-        return "item";
-    }
-
+    public String registryName() { return "item"; }
     @Override
-    public String directoryName() {
-        return "items";
-    }
-
+    public String directoryName() { return "items"; }
     @Override
     public EclipseApi.GenericDefinition parse(Map<String, Object> raw, EclipseApi.DefinitionSource source, String requiredNamespace, List<EclipseApi.ContentValidationError> errors) {
         String rawKey = string(raw, "key", true, source, errors);
         String name = Optional.ofNullable(string(raw, "name", true, source, errors)).orElse(rawKey);
-        if (rawKey == null) {
-            return null;
-        }
+        if (rawKey == null) return null;
         EclipseApi.NamespacedKey key = key(rawKey, requiredNamespace, source, errors);
-        if (key == null) {
-            return null;
-        }
-        List<EclipseApi.NamespacedKey> abilityRefs = stringList(raw, "abilities").stream()
-                .map(reference -> key(reference, requiredNamespace, source, errors))
-                .filter(Objects::nonNull)
-                .toList();
+        if (key == null) return null;
+        List<EclipseApi.NamespacedKey> abilityRefs = stringList(raw, "abilities").stream().map(reference -> key(reference, requiredNamespace, source, errors)).filter(Objects::nonNull).toList();
         List<EclipseApi.NamespacedKey> assetRefs = new ArrayList<>();
         if (raw.get("model") != null) {
             EclipseApi.NamespacedKey model = key(String.valueOf(raw.get("model")), requiredNamespace, source, errors);
-            if (model != null) {
-                assetRefs.add(model);
-            }
+            if (model != null) assetRefs.add(model);
         }
         if (raw.get("icon") != null) {
             EclipseApi.NamespacedKey icon = key(String.valueOf(raw.get("icon")), requiredNamespace, source, errors);
-            if (icon != null) {
-                assetRefs.add(icon);
-            }
+            if (icon != null) assetRefs.add(icon);
         }
-        Map<String, List<EclipseApi.NamespacedKey>> references = new LinkedHashMap<>();
-        references.put("abilities", abilityRefs);
-        references.put("assets", assetRefs);
-        return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), copyValues(raw), references, source);
+        return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), copyValues(raw), Map.of("abilities", abilityRefs, "assets", assetRefs), source);
     }
-
     @Override
     public void validateReferences(EclipseApi.GenericDefinition definition, Map<String, Map<String, EclipseApi.GenericDefinition>> stagedByRegistry, List<EclipseApi.ContentValidationError> errors) {
         requireReference("abilities", definition, stagedByRegistry, "ability", errors);
@@ -526,38 +601,21 @@ final class ItemSchema extends AbstractSchema {
 
 final class MobSchema extends AbstractSchema {
     @Override
-    public String registryName() {
-        return "mob";
-    }
-
+    public String registryName() { return "mob"; }
     @Override
-    public String directoryName() {
-        return "mobs";
-    }
-
+    public String directoryName() { return "mobs"; }
     @Override
     public EclipseApi.GenericDefinition parse(Map<String, Object> raw, EclipseApi.DefinitionSource source, String requiredNamespace, List<EclipseApi.ContentValidationError> errors) {
         String rawKey = string(raw, "key", true, source, errors);
         String name = Optional.ofNullable(string(raw, "name", true, source, errors)).orElse(rawKey);
         String lootTable = string(raw, "loot_table", true, source, errors);
-        if (rawKey == null || lootTable == null) {
-            return null;
-        }
+        if (rawKey == null || lootTable == null) return null;
         EclipseApi.NamespacedKey key = key(rawKey, requiredNamespace, source, errors);
         EclipseApi.NamespacedKey lootTableKey = key(lootTable, requiredNamespace, source, errors);
-        if (key == null || lootTableKey == null) {
-            return null;
-        }
-        List<EclipseApi.NamespacedKey> abilityRefs = stringList(raw, "abilities").stream()
-                .map(reference -> key(reference, requiredNamespace, source, errors))
-                .filter(Objects::nonNull)
-                .toList();
-        Map<String, List<EclipseApi.NamespacedKey>> references = new LinkedHashMap<>();
-        references.put("abilities", abilityRefs);
-        references.put("loot_table", List.of(lootTableKey));
-        return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), copyValues(raw), references, source);
+        if (key == null || lootTableKey == null) return null;
+        List<EclipseApi.NamespacedKey> abilityRefs = stringList(raw, "abilities").stream().map(reference -> key(reference, requiredNamespace, source, errors)).filter(Objects::nonNull).toList();
+        return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), copyValues(raw), Map.of("abilities", abilityRefs, "loot_table", List.of(lootTableKey)), source);
     }
-
     @Override
     public void validateReferences(EclipseApi.GenericDefinition definition, Map<String, Map<String, EclipseApi.GenericDefinition>> stagedByRegistry, List<EclipseApi.ContentValidationError> errors) {
         requireReference("abilities", definition, stagedByRegistry, "ability", errors);
@@ -567,33 +625,21 @@ final class MobSchema extends AbstractSchema {
 
 final class LootTableSchema extends AbstractSchema {
     @Override
-    public String registryName() {
-        return "loot_table";
-    }
-
+    public String registryName() { return "loot_table"; }
     @Override
-    public String directoryName() {
-        return "loot_tables";
-    }
-
+    public String directoryName() { return "loot_tables"; }
     @Override
     public EclipseApi.GenericDefinition parse(Map<String, Object> raw, EclipseApi.DefinitionSource source, String requiredNamespace, List<EclipseApi.ContentValidationError> errors) {
         String rawKey = string(raw, "key", true, source, errors);
         String name = Optional.ofNullable(string(raw, "name", true, source, errors)).orElse(rawKey);
-        if (rawKey == null) {
-            return null;
-        }
+        if (rawKey == null) return null;
         EclipseApi.NamespacedKey key = key(rawKey, requiredNamespace, source, errors);
-        if (key == null) {
-            return null;
-        }
-
+        if (key == null) return null;
         Object dropsObject = raw.get("drops");
         if (!(dropsObject instanceof List<?> drops) || drops.isEmpty()) {
             errors.add(new EclipseApi.ContentValidationError("missing_field", "Loot tables require a non-empty 'drops' list", source.path(), rawKey));
             return null;
         }
-
         List<EclipseApi.NamespacedKey> references = new ArrayList<>();
         for (Object drop : drops) {
             if (!(drop instanceof Map<?, ?> map)) {
@@ -606,14 +652,10 @@ final class LootTableSchema extends AbstractSchema {
                 continue;
             }
             EclipseApi.NamespacedKey parsed = key(String.valueOf(ref), requiredNamespace, source, errors);
-            if (parsed != null) {
-                references.add(parsed);
-            }
+            if (parsed != null) references.add(parsed);
         }
-
         return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), copyValues(raw), Map.of("drops", references), source);
     }
-
     @Override
     public void validateReferences(EclipseApi.GenericDefinition definition, Map<String, Map<String, EclipseApi.GenericDefinition>> stagedByRegistry, List<EclipseApi.ContentValidationError> errors) {
         requireReference("drops", definition, stagedByRegistry, "item", errors);
@@ -622,33 +664,21 @@ final class LootTableSchema extends AbstractSchema {
 
 final class RankSchema extends AbstractSchema {
     @Override
-    public String registryName() {
-        return "rank";
-    }
-
+    public String registryName() { return "rank"; }
     @Override
-    public String directoryName() {
-        return "ranks";
-    }
-
+    public String directoryName() { return "ranks"; }
     @Override
     public EclipseApi.GenericDefinition parse(Map<String, Object> raw, EclipseApi.DefinitionSource source, String requiredNamespace, List<EclipseApi.ContentValidationError> errors) {
         String rawKey = string(raw, "key", true, source, errors);
         String name = Optional.ofNullable(string(raw, "name", true, source, errors)).orElse(rawKey);
-        if (rawKey == null) {
-            return null;
-        }
+        if (rawKey == null) return null;
         EclipseApi.NamespacedKey key = key(rawKey, requiredNamespace, source, errors);
-        if (key == null) {
-            return null;
-        }
+        if (key == null) return null;
         Map<String, Object> values = copyValues(raw);
         values.putIfAbsent("cosmetic", true);
         values.putIfAbsent("permissions", List.of());
         return new EclipseApi.GenericDefinition(key, registryName(), name, tags(raw), values, Map.of(), source);
     }
-
     @Override
-    public void validateReferences(EclipseApi.GenericDefinition definition, Map<String, Map<String, EclipseApi.GenericDefinition>> stagedByRegistry, List<EclipseApi.ContentValidationError> errors) {
-    }
+    public void validateReferences(EclipseApi.GenericDefinition definition, Map<String, Map<String, EclipseApi.GenericDefinition>> stagedByRegistry, List<EclipseApi.ContentValidationError> errors) { }
 }

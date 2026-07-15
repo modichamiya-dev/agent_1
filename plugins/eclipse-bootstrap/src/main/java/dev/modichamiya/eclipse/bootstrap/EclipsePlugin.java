@@ -18,6 +18,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
@@ -87,6 +88,8 @@ final class EclipseCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("§e/eclipse content reload|status §7- manage content registries");
             sender.sendMessage("§e/eclipse assets build|status §7- build and inspect the generated pack manifest");
             sender.sendMessage("§e/eclipse timeline status|play <key> §7- inspect or preview timelines");
+            sender.sendMessage("§e/eclipse gui status|open <key>|sessions §7- inspect GUI definitions and preview sessions");
+            sender.sendMessage("§e/eclipse world status|locate|instance <key> §7- inspect region resolution and dimension reservations");
             return true;
         }
 
@@ -132,6 +135,14 @@ final class EclipseCommand implements CommandExecutor, TabCompleter {
 
         if (args[0].equalsIgnoreCase("timeline")) {
             return handleTimelineCommands(sender, args);
+        }
+
+        if (args[0].equalsIgnoreCase("gui")) {
+            return handleGuiCommands(sender, args);
+        }
+
+        if (args[0].equalsIgnoreCase("world")) {
+            return handleWorldCommands(sender, args);
         }
 
         sender.sendMessage("§cUnknown subcommand.");
@@ -223,10 +234,90 @@ final class EclipseCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean handleGuiCommands(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage("§cUsage: /eclipse gui <status|open <key>|sessions>");
+            return true;
+        }
+        EclipseApi.GuiService guiService = moduleManager.context().services().require(EclipseApi.GuiService.class);
+        if (args[1].equalsIgnoreCase("status")) {
+            EclipseApi.GuiCatalog catalog = guiService.currentCatalog();
+            sender.sendMessage("§6GUI catalog @ §f" + catalog.generatedAt());
+            sender.sendMessage("§7Registered screens: §f" + catalog.definitions().size());
+            sender.sendMessage("§7Active sessions: §f" + guiService.activeSessions().size());
+            return true;
+        }
+        if (args[1].equalsIgnoreCase("open") && args.length > 2) {
+            EclipseApi.GuiOpenResult result = guiService.openPreview(args[2], sender.getName(), Map.of());
+            sender.sendMessage((result.success() ? "§a" : "§c") + result.message() + " §7session=" + result.sessionId());
+            return true;
+        }
+        if (args[1].equalsIgnoreCase("sessions")) {
+            for (EclipseApi.GuiSessionSnapshot session : guiService.activeSessions()) {
+                sender.sendMessage("§7- §f" + session.sessionId() + " §8screen=§f" + session.screenKey() + " §8viewer=§f" + session.viewer() + " §8timelines=§f" + session.timelinesTriggered());
+            }
+            if (guiService.activeSessions().isEmpty()) {
+                sender.sendMessage("§7No active GUI sessions.");
+            }
+            return true;
+        }
+        sender.sendMessage("§cUsage: /eclipse gui <status|open <key>|sessions>");
+        return true;
+    }
+
+    private boolean handleWorldCommands(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage("§cUsage: /eclipse world <status|locate|instance <key>>");
+            return true;
+        }
+        EclipseApi.WorldService worldService = moduleManager.context().services().require(EclipseApi.WorldService.class);
+        if (args[1].equalsIgnoreCase("status")) {
+            EclipseApi.WorldCatalog catalog = worldService.currentCatalog();
+            sender.sendMessage("§6World catalog @ §f" + catalog.generatedAt());
+            sender.sendMessage("§7Regions: §f" + catalog.regions().size() + " §7Warps: §f" + catalog.warps().size() + " §7Dimensions: §f" + catalog.dimensions().size());
+            sender.sendMessage("§7Active instances: §f" + worldService.activeInstances().size());
+            return true;
+        }
+        if (args[1].equalsIgnoreCase("locate")) {
+            String worldName;
+            double x;
+            double y;
+            double z;
+            if (args.length >= 6) {
+                worldName = args[2];
+                x = Double.parseDouble(args[3]);
+                y = Double.parseDouble(args[4]);
+                z = Double.parseDouble(args[5]);
+            } else if (sender instanceof Player player) {
+                worldName = player.getWorld().getName();
+                x = player.getLocation().getX();
+                y = player.getLocation().getY();
+                z = player.getLocation().getZ();
+            } else {
+                sender.sendMessage("§cUsage: /eclipse world locate <world> <x> <y> <z>");
+                return true;
+            }
+            worldService.locate(worldName, x, y, z).ifPresentOrElse(result -> {
+                sender.sendMessage("§aRegion: §f" + result.regionKey());
+                sender.sendMessage("§7Zones: §f" + result.zones());
+                sender.sendMessage("§7Overlay: §f" + result.overlayScreenKey());
+                sender.sendMessage("§7Music: §f" + result.musicAssetKey());
+            }, () -> sender.sendMessage("§cNo region matched that location."));
+            return true;
+        }
+        if (args[1].equalsIgnoreCase("instance") && args.length > 2) {
+            EclipseApi.DimensionRequestResult result = worldService.requestInstance(args[2], sender.getName());
+            sender.sendMessage((result.success() ? "§a" : "§c") + result.message() + " §7instance=" + result.instanceId());
+            return true;
+        }
+        sender.sendMessage("§cUsage: /eclipse world <status|locate|instance <key>>");
+        return true;
+    }
+
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return List.of("reload", "module", "profile", "content", "assets", "timeline");
+            return List.of("reload", "module", "profile", "content", "assets", "timeline", "gui", "world");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("module")) {
             return List.of("list");
@@ -246,8 +337,20 @@ final class EclipseCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2 && args[0].equalsIgnoreCase("timeline")) {
             return List.of("status", "play");
         }
+        if (args.length == 2 && args[0].equalsIgnoreCase("gui")) {
+            return List.of("status", "open", "sessions");
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("world")) {
+            return List.of("status", "locate", "instance");
+        }
         if (args.length == 3 && args[0].equalsIgnoreCase("timeline") && args[1].equalsIgnoreCase("play")) {
             return new ArrayList<>(moduleManager.context().services().require(EclipseApi.TimelineService.class).currentCatalog().definitions().keySet());
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("gui") && args[1].equalsIgnoreCase("open")) {
+            return new ArrayList<>(moduleManager.context().services().require(EclipseApi.GuiService.class).currentCatalog().definitions().keySet());
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("world") && args[1].equalsIgnoreCase("instance")) {
+            return new ArrayList<>(moduleManager.context().services().require(EclipseApi.WorldService.class).currentCatalog().dimensions().keySet());
         }
         return List.of();
     }
