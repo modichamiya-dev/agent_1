@@ -3,6 +3,7 @@ package dev.modichamiya.eclipse.api;
 import javax.sql.DataSource;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -11,6 +12,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 public final class EclipseApi {
     private EclipseApi() {
@@ -75,6 +77,10 @@ public final class EclipseApi {
 
         Collection<T> values();
 
+        Collection<T> snapshot();
+
+        void replaceAll(Collection<T> definitions);
+
         boolean isFrozen();
 
         void freeze();
@@ -93,7 +99,17 @@ public final class EclipseApi {
     }
 
     public interface KeyedDefinition {
-        String key();
+        NamespacedKey namespacedKey();
+
+        default String key() {
+            return namespacedKey().asString();
+        }
+    }
+
+    public interface ContentService {
+        CompletableFuture<ContentReloadResult> reloadContent();
+
+        ContentReloadResult currentSnapshot();
     }
 
     public interface AssetService {
@@ -120,10 +136,6 @@ public final class EclipseApi {
         String status();
     }
 
-    public interface ContentService {
-        String status();
-    }
-
     public interface GameplaySystemService {
         String status();
     }
@@ -142,6 +154,85 @@ public final class EclipseApi {
 
     public interface SocialService {
         String status();
+    }
+
+    public record NamespacedKey(String namespace, String value) implements Comparable<NamespacedKey> {
+        public NamespacedKey {
+            if (namespace == null || namespace.isBlank()) {
+                throw new IllegalArgumentException("namespace cannot be blank");
+            }
+            if (value == null || value.isBlank()) {
+                throw new IllegalArgumentException("value cannot be blank");
+            }
+        }
+
+        public static NamespacedKey parse(String raw) {
+            if (raw == null || raw.isBlank() || !raw.contains(":")) {
+                throw new IllegalArgumentException("Expected namespaced key in the format namespace:value but got '" + raw + "'");
+            }
+            String[] split = raw.split(":", 2);
+            return new NamespacedKey(split[0].trim().toLowerCase(), split[1].trim().toLowerCase());
+        }
+
+        public String asString() {
+            return namespace + ":" + value;
+        }
+
+        @Override
+        public String toString() {
+            return asString();
+        }
+
+        @Override
+        public int compareTo(NamespacedKey other) {
+            return asString().compareTo(other.asString());
+        }
+    }
+
+    public record DefinitionSource(String path, int priority) {
+    }
+
+    public record GenericDefinition(
+            NamespacedKey namespacedKey,
+            String registryName,
+            String displayName,
+            Set<String> tags,
+            Map<String, Object> values,
+            Map<String, List<NamespacedKey>> references,
+            DefinitionSource source
+    ) implements KeyedDefinition {
+        public GenericDefinition {
+            tags = Set.copyOf(tags);
+            values = Map.copyOf(values);
+            references = references.entrySet().stream().collect(Collectors.toUnmodifiableMap(
+                    Map.Entry::getKey,
+                    entry -> List.copyOf(entry.getValue())
+            ));
+        }
+    }
+
+    public record ContentValidationError(String code, String message, String sourcePath, String key) {
+    }
+
+    public record ContentReloadResult(
+            boolean success,
+            Instant loadedAt,
+            Map<String, Integer> registryCounts,
+            Map<String, List<String>> loadedKeys,
+            List<ContentValidationError> errors
+    ) {
+        public ContentReloadResult {
+            registryCounts = Map.copyOf(registryCounts);
+            loadedKeys = loadedKeys.entrySet().stream().collect(Collectors.toUnmodifiableMap(
+                    Map.Entry::getKey,
+                    entry -> List.copyOf(entry.getValue())
+            ));
+            errors = List.copyOf(errors);
+        }
+
+        public static ContentReloadResult empty() {
+            return new ContentReloadResult(true, Instant.EPOCH, Map.of(), Map.of(), List.of());
+        }
     }
 
     public record ProgressionScaffold(

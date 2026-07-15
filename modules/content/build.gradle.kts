@@ -1,6 +1,7 @@
 dependencies {
     implementation(project(":modules:api"))
     implementation(project(":modules:core"))
+    implementation(project(":modules:config"))
     implementation(project(":modules:registry"))
     implementation(project(":modules:assets"))
     implementation(project(":modules:animation"))
@@ -9,4 +10,6 @@ dependencies {
     implementation(project(":modules:ai"))
     implementation(project(":modules:admin"))
     implementation(project(":modules:gameplay"))
+    implementation("com.google.code.gson:gson:2.11.0")
+    implementation("org.yaml:snakeyaml:2.3")
 }

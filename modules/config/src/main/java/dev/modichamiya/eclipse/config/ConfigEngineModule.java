@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -63,6 +62,8 @@ public final class ConfigEngineModule implements CoreRuntime.EngineModule {
 
         defaults.put("content", Map.of(
                 "content-directory", "content",
+                "overrides-directory", "content-overrides",
+                "required-namespace", "eclipse",
                 "hot-reload-enabled", true
         ));
 

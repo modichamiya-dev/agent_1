@@ -3,7 +3,10 @@ package dev.modichamiya.eclipse.registry;
 import dev.modichamiya.eclipse.api.EclipseApi;
 import dev.modichamiya.eclipse.core.CoreRuntime;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -29,7 +32,6 @@ public final class RegistryEngineModule implements CoreRuntime.EngineModule {
     @Override
     public void onReload(CoreRuntime.ModuleContext context) {
         EclipseApi.RegistryService registries = context.services().require(EclipseApi.RegistryService.class);
-        registries.unfreezeAll();
         registries.freezeAll();
         context.eventBus().publish(new EclipseApi.ContentReloadedEvent(java.time.Instant.now()));
     }
@@ -61,12 +63,12 @@ final class RegistryServiceImpl implements EclipseApi.RegistryService {
 }
 
 final class SimpleMutableRegistry<T extends EclipseApi.KeyedDefinition> implements EclipseApi.MutableRegistry<T> {
-    private final Map<String, T> mutableEntries = new ConcurrentHashMap<>();
+    private final Map<String, T> mutableEntries = new LinkedHashMap<>();
     private volatile Map<String, T> frozenView = Map.of();
     private volatile boolean frozen;
 
     @Override
-    public void register(T definition) {
+    public synchronized void register(T definition) {
         if (frozen) {
             throw new IllegalStateException("Registry is frozen");
         }
@@ -74,7 +76,7 @@ final class SimpleMutableRegistry<T extends EclipseApi.KeyedDefinition> implemen
     }
 
     @Override
-    public void unregister(String key) {
+    public synchronized void unregister(String key) {
         if (frozen) {
             throw new IllegalStateException("Registry is frozen");
         }
@@ -82,13 +84,29 @@ final class SimpleMutableRegistry<T extends EclipseApi.KeyedDefinition> implemen
     }
 
     @Override
-    public Optional<T> get(String key) {
+    public synchronized Optional<T> get(String key) {
         return Optional.ofNullable(frozen ? frozenView.get(key) : mutableEntries.get(key));
     }
 
     @Override
-    public Collection<T> values() {
-        return frozen ? frozenView.values() : mutableEntries.values();
+    public synchronized Collection<T> values() {
+        return frozen ? List.copyOf(frozenView.values()) : List.copyOf(mutableEntries.values());
+    }
+
+    @Override
+    public synchronized Collection<T> snapshot() {
+        return values();
+    }
+
+    @Override
+    public synchronized void replaceAll(Collection<T> definitions) {
+        if (frozen) {
+            throw new IllegalStateException("Registry is frozen");
+        }
+        mutableEntries.clear();
+        for (T definition : definitions) {
+            mutableEntries.put(definition.key(), definition);
+        }
     }
 
     @Override
@@ -97,13 +115,13 @@ final class SimpleMutableRegistry<T extends EclipseApi.KeyedDefinition> implemen
     }
 
     @Override
-    public void freeze() {
+    public synchronized void freeze() {
         this.frozenView = Map.copyOf(mutableEntries);
         this.frozen = true;
     }
 
     @Override
-    public void unfreeze() {
+    public synchronized void unfreeze() {
         this.frozen = false;
         this.frozenView = Map.of();
     }
